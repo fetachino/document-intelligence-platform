@@ -1,0 +1,71 @@
+﻿name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  full-check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: ankane/pgvector:latest
+        env:
+          POSTGRES_DB: docdb
+          POSTGRES_USER: docuser
+          POSTGRES_PASSWORD: docpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U docuser -d docdb"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install Poetry
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+
+      - name: Install backend deps with Poetry (including dev)
+        run: |
+          poetry config virtualenvs.create false
+          poetry install --with dev --no-interaction --no-ansi
+
+      - name: Ruff format check
+        run: |
+          poetry run ruff check .
+
+      - name: Type checking
+        run: |
+          poetry run mypy backend || true
+
+      - name: Run Alembic migrations and backend tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://docuser:docpass@localhost:5432/docdb
+        run: |
+          poetry run alembic upgrade head
+          poetry run pytest backend/tests -q --maxfail=1
+
+      - name: Frontend - install and test
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint || true
+          npm run typecheck || true
+          npm run test -- --coverage || true
+          npm run build || true
+
+      - name: Build Docker images
+        run: |
+          docker build -f ./backend/Dockerfile -t dip-backend .
+          docker build -t dip-frontend ./frontend
