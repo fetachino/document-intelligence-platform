@@ -14,8 +14,12 @@ Background processing
 - Uploads and explicit reprocessing requests create durable processing jobs.
 - `GET /api/v1/documents/{document_id}/jobs` returns lifecycle records and attempt counts.
 - `POST /api/v1/documents/{document_id}/process` queues idempotent reprocessing.
-- The current local worker uses FastAPI background tasks with bounded immediate retries;
-  a distributed queue and separately scaled workers are not implemented yet.
+- FastAPI background tasks remain the default with `JOB_TRANSPORT=local`.
+- `JOB_TRANSPORT=rq` sends only persisted job IDs through Redis to the standalone
+  `python -m backend.app.worker` process. PostgreSQL claiming and bounded attempts remain
+  authoritative; RQ transport retries are disabled.
+- Docker Compose includes Redis and a worker service. Set `JOB_TRANSPORT=rq` for the API to use
+  distributed delivery; both API and worker share PostgreSQL and configured object storage.
 
 Object storage
 - Local filesystem storage remains the default through `STORAGE_BACKEND=local`.

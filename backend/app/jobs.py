@@ -8,6 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
 from .database import get_session, get_sessionmaker
+from .job_transport import (
+    DocumentJobTransport,
+    JobTransportSettings,
+    LocalBackgroundTaskTransport,
+    create_rq_transport,
+)
 from .models import DocumentProcessingJob, ProcessingJobStatus, utc_now
 from .processing import ProcessingOutcome, process_document
 
@@ -64,26 +70,24 @@ class LocalDocumentJobWorker:
                 return
 
 
-class LocalDocumentJobDispatcher:
-    """Persist jobs and schedule the local worker with FastAPI BackgroundTasks."""
+class DurableDocumentJobDispatcher:
+    """Persist authoritative job state before dispatching its identifier."""
 
     def __init__(
         self,
-        background_tasks: BackgroundTasks,
         session: AsyncSession,
-        worker: DocumentJobWorker | None = None,
+        transport: DocumentJobTransport,
         max_attempts: int = 2,
     ) -> None:
-        self._background_tasks = background_tasks
         self._session = session
-        self._worker = worker or LocalDocumentJobWorker()
+        self._transport = transport
         self._max_attempts = max_attempts
 
     async def enqueue(self, document_id: str) -> DocumentProcessingJob:
         active_job = await _get_active_job(self._session, document_id)
         if active_job is not None:
             if active_job.status == ProcessingJobStatus.queued:
-                self._background_tasks.add_task(self._worker.run, active_job.id)
+                await self._transport.dispatch(active_job.id)
             return active_job
 
         job = DocumentProcessingJob(
@@ -103,8 +107,26 @@ class LocalDocumentJobDispatcher:
             job = active_job
 
         if job.status == ProcessingJobStatus.queued:
-            self._background_tasks.add_task(self._worker.run, job.id)
+            await self._transport.dispatch(job.id)
         return job
+
+
+class LocalDocumentJobDispatcher(DurableDocumentJobDispatcher):
+    """Preserve FastAPI background-task delivery as the default transport."""
+
+    def __init__(
+        self,
+        background_tasks: BackgroundTasks,
+        session: AsyncSession,
+        worker: DocumentJobWorker | None = None,
+        max_attempts: int = 2,
+    ) -> None:
+        active_worker = worker or LocalDocumentJobWorker()
+        super().__init__(
+            session,
+            LocalBackgroundTaskTransport(background_tasks, active_worker),
+            max_attempts,
+        )
 
 
 async def _get_active_job(
@@ -200,4 +222,7 @@ def get_document_job_dispatcher(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
 ) -> DocumentJobDispatcher:
-    return LocalDocumentJobDispatcher(background_tasks, session)
+    settings = JobTransportSettings.from_environment()
+    if settings.transport == "local":
+        return LocalDocumentJobDispatcher(background_tasks, session)
+    return DurableDocumentJobDispatcher(session, create_rq_transport(settings))

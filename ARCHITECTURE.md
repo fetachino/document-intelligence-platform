@@ -13,8 +13,8 @@ High level components
 - Backend (FastAPI): API, DB models, document ingestion, processing orchestration, secure storage
 - Storage: replaceable local-default or S3-compatible private object storage provider
 - Database: PostgreSQL with pgvector for stored embeddings and cosine retrieval
-- Worker: durable processing jobs executed by a local FastAPI background-task transport;
-  distributed queue transports are planned
+- Worker: durable processing jobs executed through the local FastAPI background-task transport
+  by default or delivered through Redis/RQ to a standalone process
 - Providers: replaceable local OCR, classification, extraction, embedding, and answer
   implementations; external providers are planned
 
@@ -108,8 +108,11 @@ Current background worker slice
 - Jobs expose queued, running, succeeded, and failed states, timestamps, bounded attempt
   counts, and stable error codes. Re-enqueueing active work returns the existing job;
   reprocessing after a terminal job creates a new history record.
-- FastAPI `BackgroundTasks` remains the local development transport. Celery, RQ, separate
-  worker services, scheduling, and distributed recovery semantics are not implemented.
+- FastAPI `BackgroundTasks` remains the default local transport. `JOB_TRANSPORT=rq` selects a
+  thin Redis/RQ adapter that sends only persisted job IDs to `backend.app.worker`.
+- The standalone worker invokes the same atomic claim and bounded-attempt loop. RQ retries are
+  disabled so transport delivery cannot compete with database-owned retry state; duplicate
+  deliveries become no-ops after a job leaves queued state.
 
 Current frontend workspace slice
 - A centralized typed client owns document, job-history, upload, and reprocessing requests.

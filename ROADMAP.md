@@ -31,7 +31,7 @@ Milestone 3 (in progress)
 - Semantic-search frontend workflow (implemented)
 - Grounded Q&A frontend workflow (implemented)
 - Observable worker/job architecture with replaceable dispatcher (local slice implemented)
-- Distributed worker transport and scaling (Celery/RQ or equivalent, planned)
+- Redis/RQ transport and standalone worker process (implemented); scaling validation remains planned
 - Kubernetes deployment architecture (planned)
 - S3-compatible private storage adapter (implemented); signed URL support remains planned if needed
 - RBAC and multi-tenant features

@@ -18,10 +18,14 @@ if [ $i -ge $MAX_WAIT ]; then
 fi
 
 # Run migrations if alembic present
-if [ -f /app/alembic.ini ]; then
+if [ "${RUN_MIGRATIONS:-true}" = "true" ] && [ -f /app/alembic.ini ]; then
   echo "Running alembic upgrade head"
   alembic upgrade head || true
 fi
 
-# Start uvicorn
+# A Compose worker supplies its own fixed module command after database readiness.
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
+
 exec uvicorn backend.app.main:app --host 0.0.0.0 --port 8000

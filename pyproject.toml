@@ -23,6 +23,8 @@ pillow = "^12.3.0"
 python-docx = "^1.2.0"
 pgvector = "^0.4.1"
 boto3 = "^1.40.0"
+rq = "^2.6.0"
+redis = "^6.4.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"

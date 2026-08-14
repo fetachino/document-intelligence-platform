@@ -44,4 +44,5 @@ Current Milestone 3 worker slice
 - Only one queued or running job may exist for a document; terminal jobs remain as history.
 - The local worker atomically claims jobs and makes at most two processing attempts.
 - Persisted errors use stable codes rather than exception text or document content.
-- Distributed queue transports and independently scaled worker processes remain planned.
+- RQ can deliver stable job IDs through Redis to a standalone worker process; PostgreSQL
+  claiming and bounded attempts remain authoritative.

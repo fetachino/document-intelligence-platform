@@ -31,6 +31,10 @@ Background jobs
 - Job failures persist stable error codes, not exception text or document content.
 - Active jobs are claimed by ID and do not grant workers arbitrary SQL, filesystem, shell,
   or tool access beyond the existing document processor dependencies.
+- The RQ producer submits only job IDs to one fixed module entrypoint. User input cannot select
+  task names or functions, and raw documents and storage credentials are never queue payloads.
+- Broker URLs and credentials come from environment configuration. Transport failures collapse
+  to a stable error without logging raw broker exceptions.
 
 Grounded answering
 - Answer providers receive retrieved text only; they are not given database sessions,
