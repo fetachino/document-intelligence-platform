@@ -101,4 +101,35 @@ describe('documentApi', () => {
       },
     )
   })
+
+  test('builds typed global and document-scoped search requests', async () => {
+    const response = { query: 'invoice total', results: [] }
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      documentApi.searchDocuments({ query: 'invoice total', limit: 5 }),
+    ).resolves.toEqual(response)
+    await documentApi.searchDocuments({
+      query: 'invoice total',
+      limit: 10,
+      documentId: 'doc/one',
+    })
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/search?q=invoice+total&limit=5',
+      undefined,
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/search?q=invoice+total&limit=10&document_id=doc%2Fone',
+      undefined,
+    )
+  })
 })

@@ -89,6 +89,26 @@ export interface StructuredFieldReviewHistory {
   corrections: StructuredFieldCorrection[]
 }
 
+export interface SemanticSearchRequest {
+  query: string
+  limit: number
+  documentId?: string
+}
+
+export interface SemanticSearchResult {
+  document_id: string
+  page_number: number
+  chunk_index: number
+  text: string
+  embedding_model: string
+  distance: number
+}
+
+export interface SemanticSearchResponse {
+  query: string
+  results: SemanticSearchResult[]
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -162,6 +182,11 @@ export const documentApi = {
         body: JSON.stringify({ value, reviewer_id: reviewerId }),
       },
     ),
+  searchDocuments: ({ query, limit, documentId }: SemanticSearchRequest) => {
+    const params = new URLSearchParams({ q: query, limit: String(limit) })
+    if (documentId) params.set('document_id', documentId)
+    return request<SemanticSearchResponse>(`/api/v1/search?${params.toString()}`)
+  },
   reprocessDocument: (documentId: string) =>
     request<ProcessingJob>(`/api/v1/documents/${encodeURIComponent(documentId)}/process`, {
       method: 'POST',

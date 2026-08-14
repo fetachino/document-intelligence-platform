@@ -8,6 +8,7 @@ import {
   type ProcessingJob,
 } from './api/client'
 import { DocumentLibrary } from './components/DocumentLibrary'
+import { SemanticSearch } from './components/SemanticSearch'
 import {
   DocumentWorkspace,
   type WorkspaceFeedback,
@@ -260,6 +261,8 @@ export default function App({ pollIntervalMs = DEFAULT_POLL_INTERVAL_MS }: AppPr
           {uploadFeedback.message}
         </p>
       )}
+
+      <SemanticSearch documents={documents} selectedDocument={selectedDocument} />
 
       <div className="workspace-layout">
         <DocumentLibrary

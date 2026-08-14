@@ -25,6 +25,33 @@ button { letter-spacing: 0; }
 .button-primary { color: #fff; background: #16776f; }
 .button-primary:hover:not(:disabled) { background: #0f625c; }
 .button-secondary { color: #263442; background: #fff; border-color: #b8c3cc; }
+.semantic-search { padding: 24px clamp(20px, 4vw, 56px); background: #eef3f5; border-bottom: 1px solid #cbd5dc; }
+.search-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.search-heading h2 { margin: 0; font-size: 1.15rem; letter-spacing: 0; }
+.search-result-count { color: #526573; font-size: .82rem; font-weight: 700; }
+.search-form { display: grid; grid-template-columns: minmax(240px, 1fr) auto 90px auto; align-items: end; gap: 12px; }
+.search-query-field, .search-limit { min-width: 0; display: grid; gap: 7px; }
+.search-query-field span, .search-limit span, .search-scope legend { color: #526573; font-size: .78rem; font-weight: 700; }
+.search-query-field input, .search-limit select { width: 100%; min-height: 40px; padding: 8px 10px; color: #263442; background: #fff; border: 1px solid #aebbc5; border-radius: 4px; }
+.search-scope { min-width: 0; margin: 0; padding: 0; border: 0; }
+.search-scope legend { margin-bottom: 7px; }
+.segmented-control { min-height: 40px; display: flex; background: #fff; border: 1px solid #aebbc5; border-radius: 4px; overflow: hidden; }
+.segmented-control label { min-width: 132px; padding: 8px 11px; display: grid; place-items: center; color: #435665; font-size: .8rem; font-weight: 700; cursor: pointer; }
+.segmented-control label + label { border-left: 1px solid #aebbc5; }
+.segmented-control label[data-selected="true"] { color: #fff; background: #16776f; }
+.segmented-control label[data-disabled="true"] { cursor: not-allowed; opacity: .45; }
+.segmented-control input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.search-submit { min-height: 40px; }
+.search-scope-context { margin: 12px 0 0; color: #526573; font-size: .82rem; }
+.search-results { margin-top: 18px; border-top: 1px solid #c1cdd5; }
+.search-result-row { padding: 16px 0; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px; border-bottom: 1px solid #cbd5dc; }
+.search-result-rank { width: 30px; height: 30px; display: grid; place-items: center; color: #fff; background: #405b68; border-radius: 3px; font-size: .8rem; font-weight: 800; }
+.search-result-body { min-width: 0; }
+.search-result-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; }
+.search-result-title strong { overflow-wrap: anywhere; }
+.search-result-title code { color: #687986; font-size: .72rem; overflow-wrap: anywhere; }
+.search-result-body p { margin: 9px 0; color: #263442; line-height: 1.55; overflow-wrap: anywhere; }
+.search-result-metadata { display: flex; flex-wrap: wrap; gap: 6px 16px; color: #637482; font-size: .75rem; }
 .workspace-layout { min-height: calc(100vh - 96px); display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); }
 .document-library { padding: 24px 18px; background: #fff; border-right: 1px solid #d7dee4; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
@@ -116,6 +143,8 @@ button { letter-spacing: 0; }
   .topbar { align-items: stretch; flex-direction: column; }
   .upload-control { width: 100%; }
   .file-picker { width: 100%; }
+  .search-form { grid-template-columns: 1fr 100px; }
+  .search-query-field, .search-scope { grid-column: 1 / -1; }
   .workspace-layout { grid-template-columns: 1fr; }
   .document-library { border-right: 0; border-bottom: 1px solid #d7dee4; }
   .metadata-band { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -131,6 +160,12 @@ button { letter-spacing: 0; }
 @media (max-width: 480px) {
   .upload-control, .workspace-header { align-items: stretch; flex-direction: column; }
   .upload-control .button, .workspace-header .button { width: 100%; }
+  .search-form { grid-template-columns: 1fr; }
+  .search-query-field, .search-scope { grid-column: 1; }
+  .segmented-control { align-items: stretch; flex-direction: column; }
+  .segmented-control label { min-width: 0; }
+  .segmented-control label + label { border-top: 1px solid #aebbc5; border-left: 0; }
+  .search-submit { width: 100%; }
   .metadata-band { grid-template-columns: 1fr; }
   .classification-summary { grid-template-columns: 1fr; }
   .classification-review-controls { align-items: stretch; flex-direction: column; }
