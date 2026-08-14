@@ -21,7 +21,7 @@ Notes for Milestone 1
 - The project now uses Alembic for schema migrations; agents must assume the database schema is managed via migrations rather than SQLModel.create_all in production.
 - Agents must obtain DB sessions via the FastAPI dependency get_session to ensure transactional safety and consistent async session lifecycle.
 
-Milestone 2 implementation
+Completed Milestone 2 implementation
 - Document processing is dispatched through a replaceable abstraction.
 - The initial implementation uses FastAPI background tasks and a local, idempotent processor.
 - OCR/text extraction, per-page persistence, local classification, and deterministic
@@ -31,4 +31,5 @@ Milestone 2 implementation
   missing fields retain explicitly orphaned audit history.
 - Successful processing indexes non-empty page text with the replaceable local embedding
   provider and atomically replaces stale chunks.
-- Later pipeline stages remain deferred.
+- Grounded Q&A uses retrieved chunks only and binds citations from stored provenance.
+- External providers, distributed workers, and Milestone 3 infrastructure remain deferred.

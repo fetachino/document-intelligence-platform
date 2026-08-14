@@ -14,19 +14,18 @@ Milestone 1 - Complete and verified
 - Docker Compose with PostgreSQL + pgvector service
 - CI: GitHub Actions for linting, type checks, and tests
 
-Milestone 2 (in progress)
+Milestone 2 - Complete and verified
 - OCR pipeline and per-page text storage (implemented in the first slice)
 - Document classification service and API review flow (implemented)
-- Classification review UI (planned)
 - Structured field extractors for invoices, resumes, contracts (implemented)
 - Structured field correction workflow (implemented as an API slice)
-- Human review & correction UI (planned)
 - Chunking + local embeddings storage in pgvector (implemented)
-- Semantic search API (implemented); search UI planned
-- Grounded Q&A pipeline with citation linking
-- Evaluation dataset and metrics reporting
+- Semantic search API (implemented)
+- Grounded Q&A API with citation linking (implemented)
+- Deterministic local evaluation dataset and computed metrics (implemented)
 
 Milestone 3 (planned)
+- Review, search, and grounded Q&A frontend workflows
 - Scalable worker architecture (Celery/RQ/Kubernetes)
 - S3-compatible storage adapter and signed URL support
 - RBAC and multi-tenant features

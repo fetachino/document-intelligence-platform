@@ -1,0 +1,73 @@
+{
+  "documents": [
+    {
+      "key": "atlas",
+      "pages": [
+        "Project Atlas deadline is September 30, 2026. Alpha delivery date is September 10, 2026.",
+        "Beta delivery date is September 20, 2026. Project Atlas owner is Dana Lee."
+      ]
+    },
+    {
+      "key": "ocean",
+      "pages": [
+        "Project Ocean deadline is December 15, 2026. Project Ocean owner is Morgan Reed."
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "name": "answerable_atlas_deadline",
+      "question": "What is the Project Atlas deadline?",
+      "document_scope": ["atlas"],
+      "retrieval_limit": 5,
+      "expected_status": "answered",
+      "expected_answer_contains": ["September 30, 2026"],
+      "expected_citations": [
+        {"document_key": "atlas", "page_number": 1, "chunk_index": 0}
+      ]
+    },
+    {
+      "name": "multiple_citations",
+      "question": "What are the Alpha and Beta delivery dates?",
+      "document_scope": ["atlas"],
+      "retrieval_limit": 5,
+      "expected_status": "answered",
+      "expected_answer_contains": ["September 10, 2026", "September 20, 2026"],
+      "expected_citations": [
+        {"document_key": "atlas", "page_number": 1, "chunk_index": 0},
+        {"document_key": "atlas", "page_number": 2, "chunk_index": 0}
+      ]
+    },
+    {
+      "name": "insufficient_evidence",
+      "question": "What is the Project Atlas budget?",
+      "document_scope": ["atlas"],
+      "retrieval_limit": 5,
+      "expected_status": "insufficient_evidence",
+      "expected_answer_contains": ["Insufficient evidence"],
+      "expected_citations": []
+    },
+    {
+      "name": "document_scoped_ocean",
+      "question": "What is the Project Ocean owner?",
+      "document_scope": ["ocean"],
+      "retrieval_limit": 5,
+      "expected_status": "answered",
+      "expected_answer_contains": ["Morgan Reed"],
+      "expected_citations": [
+        {"document_key": "ocean", "page_number": 1, "chunk_index": 0}
+      ]
+    },
+    {
+      "name": "unscoped_retrieval_relevance",
+      "question": "What is the Project Ocean deadline?",
+      "document_scope": null,
+      "retrieval_limit": 1,
+      "expected_status": "answered",
+      "expected_answer_contains": ["December 15, 2026"],
+      "expected_citations": [
+        {"document_key": "ocean", "page_number": 1, "chunk_index": 0}
+      ]
+    }
+  ]
+}

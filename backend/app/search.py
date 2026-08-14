@@ -1,7 +1,8 @@
+from collections.abc import Sequence
 from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+from sqlmodel import col, select
 
 from .embeddings import EmbeddingProvider, LocalHashEmbeddingProvider
 from .models import DocumentChunk, SemanticSearchResult
@@ -12,6 +13,7 @@ async def semantic_search(
     query: str,
     limit: int,
     provider: EmbeddingProvider | None = None,
+    document_ids: Sequence[str] | None = None,
 ) -> list[SemanticSearchResult]:
     """Rank compatible stored chunks by pgvector cosine distance."""
 
@@ -22,12 +24,15 @@ async def semantic_search(
 
     embedding_column = cast(Any, DocumentChunk).embedding
     distance = embedding_column.cosine_distance(vectors[0])
-    result = await session.execute(
+    statement = (
         select(DocumentChunk, distance.label("distance"))
         .where(DocumentChunk.embedding_model == active_provider.model)
         .order_by(distance)
         .limit(limit)
     )
+    if document_ids is not None:
+        statement = statement.where(col(DocumentChunk.document_id).in_(document_ids))
+    result = await session.execute(statement)
     return [
         SemanticSearchResult(
             document_id=chunk.document_id,

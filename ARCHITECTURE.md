@@ -13,8 +13,8 @@ High level components
 - Storage: local file storage adapter for dev; S3-compatible adapter planned for production
 - Database: PostgreSQL with pgvector for stored embeddings and cosine retrieval
 - Worker: local FastAPI background tasks; distributed workers are planned
-- Providers: replaceable local OCR, classification, extraction, and embedding implementations;
-  external providers are planned
+- Providers: replaceable local OCR, classification, extraction, embedding, and answer
+  implementations; external providers are planned
 
 Data flow
 1. User uploads a document via the frontend
@@ -22,7 +22,7 @@ Data flow
 3. Worker picks up the document, extracts text (native or OCR), and stores per-page text
 4. Deterministic classifiers and extractors produce reviewable types and structured fields
 5. Text is chunked, embeddings are generated and stored in pgvector
-6. Semantic search returns ranked source chunks; grounded answer generation is planned
+6. Grounded Q&A selects answers from ranked source chunks and binds stored provenance
 
 Notes
 - All components use environment-based configuration
@@ -32,7 +32,7 @@ Notes
 
 Database strategy
 - Development and unit tests use SQLite + aiosqlite for fast, isolated runs.
-- Production uses PostgreSQL with pgvector and the asyncpg driver.
+- PostgreSQL integration and the containerized runtime use pgvector with asyncpg.
 - Schema changes are managed with Alembic migrations located in alembic/; do not rely on SQLModel.metadata.create_all() in production.
 
 Storage
@@ -79,4 +79,15 @@ Current embeddings and retrieval slice
 - Successful indexing atomically replaces a document's prior chunks. Empty pages produce
   no embeddings, and successful empty reprocessing removes stale chunks.
 - Semantic search returns ranked source chunks and genuine pgvector cosine distance only;
-  answer generation remains outside this slice.
+  retrieval remains separate from answer generation.
+
+Current grounded Q&A and evaluation slice
+- The answer generator receives only the question and retrieved text, with no database,
+  filesystem, shell, SQL, or arbitrary tool access.
+- `local_extractive_v1` selects source sentences deterministically and refuses when the
+  selected evidence does not cover the question's content terms.
+- The orchestration layer validates selected result indexes and builds citations from
+  stored chunk provenance, so the provider cannot supply document or page identifiers.
+- Responses include citations and the ranked retrieval set with pgvector distances.
+- The checked-in synthetic evaluation dataset measures answer status, expected content,
+  citations, provenance grounding, and retrieval relevance for local development only.

@@ -56,6 +56,11 @@ class StructuredFieldReviewStatus(str, Enum):
     orphaned = "orphaned"
 
 
+class QaAnswerStatus(str, Enum):
+    answered = "answered"
+    insufficient_evidence = "insufficient_evidence"
+
+
 class Document(SQLModel, table=True):
     id: Optional[str] = Field(
         default_factory=lambda: str(uuid.uuid4()), primary_key=True
@@ -322,3 +327,33 @@ class SemanticSearchResult(SQLModel):
 class SemanticSearchResponse(SQLModel):
     query: str
     results: list[SemanticSearchResult] = Field(default_factory=list)
+
+
+class QaRequest(SQLModel):
+    question: str = Field(min_length=1, max_length=500)
+    document_ids: Optional[list[str]] = Field(default=None, max_length=20)
+    retrieval_limit: int = Field(default=5, ge=1, le=10)
+
+
+class QaCitation(SQLModel):
+    document_id: str
+    page_number: int
+    chunk_index: int
+    source_snippet: str
+    distance: float
+
+
+class QaRetrievalMetadata(SQLModel):
+    result_count: int
+    retrieval_limit: int
+    document_ids: Optional[list[str]]
+    embedding_model: str
+    results: list[SemanticSearchResult] = Field(default_factory=list)
+
+
+class QaResponse(SQLModel):
+    answer: str
+    status: QaAnswerStatus
+    citations: list[QaCitation] = Field(default_factory=list)
+    retrieval: QaRetrievalMetadata
+    answer_provider: str
