@@ -24,7 +24,14 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+asyncpg://docuser:docpass@db:5432/docdb
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       STORAGE_PATH: /data/uploads
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
       DB_HOST: db
       DB_PORT: '5432'
       DB_USER: docuser

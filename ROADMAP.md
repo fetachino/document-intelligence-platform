@@ -33,7 +33,7 @@ Milestone 3 (in progress)
 - Observable worker/job architecture with replaceable dispatcher (local slice implemented)
 - Distributed worker transport and scaling (Celery/RQ or equivalent, planned)
 - Kubernetes deployment architecture (planned)
-- S3-compatible storage adapter and signed URL support
+- S3-compatible private storage adapter (implemented); signed URL support remains planned if needed
 - RBAC and multi-tenant features
 - Deployment manifests for Kubernetes and cloud providers
 - End-to-end performance and security tests

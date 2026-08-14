@@ -11,6 +11,17 @@ Uploads
 - Store uploaded files outside the web root and serve via secure, signed URLs when necessary.
 - File writes are performed off the event loop (asyncio.to_thread) to avoid blocking the ASGI event loop.
 - Partially written files are deleted if database persistence fails.
+- Object keys are generated from internal document IDs and sanitized filenames; callers cannot
+  submit arbitrary keys. New database rows do not contain machine-specific paths.
+
+Object storage
+- S3-compatible credentials are read only from environment/provider configuration and are not
+  written to database rows or logs.
+- The application performs private object operations only and does not set public bucket or object
+  ACLs. Bucket policy and transport security remain deployment-operator trust boundaries.
+- Provider failures are surfaced through stable storage error codes without provider exception
+  details. Network calls use bounded SDK timeouts and retries.
+- Signed URLs are not currently required or exposed.
 
 Logging
 - Include request IDs in logs.

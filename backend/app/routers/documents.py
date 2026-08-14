@@ -1,6 +1,4 @@
-import io
 import logging
-import os
 from collections.abc import Sequence
 from typing import List
 
@@ -33,7 +31,14 @@ from ..models import (
     utc_now,
 )
 from ..processing import reextract_document_fields
-from ..storage import is_allowed_extension, save_upload, validate_file_size
+from ..storage import (
+    StorageError,
+    StorageProvider,
+    build_document_object_key,
+    get_storage_provider,
+    is_allowed_extension,
+    validate_file_size,
+)
 from ..structured_review import LocalStructuredFieldReviewer, StructuredFieldReviewError
 
 router = APIRouter()
@@ -44,6 +49,7 @@ async def upload_document(
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
     dispatcher: DocumentJobDispatcher = Depends(get_document_job_dispatcher),
+    storage: StorageProvider = Depends(get_storage_provider),
 ) -> dict:
     if not file.filename or not isinstance(file.filename, str) or not file.filename.strip():
         raise HTTPException(status_code=400, detail="missing_filename")
@@ -51,26 +57,29 @@ async def upload_document(
 
     if not is_allowed_extension(filename):
         raise HTTPException(status_code=400, detail="unsupported_file_type")
-    content_bytes = await file.read()
-    content = io.BytesIO(content_bytes)
+    content = await file.read()
     try:
         size = validate_file_size(content)
     except ValueError:
         raise HTTPException(status_code=400, detail="file_too_large")
 
-    try:
-        storage_path = await save_upload(content, filename)
-    except Exception:
-        logging.exception("Failed to save upload")
-        raise HTTPException(status_code=500, detail="storage_error")
-
     document = Document(
         filename=filename,
         content_type=file.content_type or "application/octet-stream",
         size=size,
-        storage_path=storage_path,
+        storage_path="",
         status=ProcessingStatus.uploaded,
     )
+    if document.id is None:
+        raise HTTPException(status_code=500, detail="document_id_error")
+    storage_reference = build_document_object_key(document.id, filename)
+    try:
+        await storage.save(storage_reference, content)
+    except StorageError:
+        logging.error("Failed to save document object")
+        raise HTTPException(status_code=500, detail="storage_error")
+    document.storage_path = storage_reference
+
     try:
         session.add(document)
         await session.commit()
@@ -78,10 +87,9 @@ async def upload_document(
     except SQLAlchemyError:
         logging.exception("Database error when storing document metadata")
         try:
-            if os.path.exists(storage_path):
-                os.remove(storage_path)
-        except Exception:
-            pass
+            await storage.delete(storage_reference)
+        except StorageError:
+            logging.error("Failed to delete document object after database error")
         await session.rollback()
         raise HTTPException(status_code=500, detail="db_error")
 

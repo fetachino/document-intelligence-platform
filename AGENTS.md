@@ -17,6 +17,8 @@ Agent guidelines
 - All network calls must have timeouts and retries.
 - Agents must update document processing status in the database.
 - Workers must claim queued jobs before processing and use bounded retries.
+- Workers must retrieve source bytes through the configured storage provider rather than
+  assuming an API-local filesystem path.
 - Sensitive document text must never be logged.
 
 Notes for Milestone 1

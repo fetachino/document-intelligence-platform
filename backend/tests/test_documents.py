@@ -1,5 +1,6 @@
 import io
 import asyncio
+from pathlib import Path
 from fastapi.testclient import TestClient
 
 
@@ -36,3 +37,7 @@ def test_upload_and_list(tmp_path, monkeypatch):
     docs = r2.json()
     assert len(docs) == 1
     assert docs[0]['filename'] == 'test.pdf'
+    storage_reference = docs[0]['storage_path']
+    assert storage_reference.startswith(f"documents/{data['id']}/")
+    assert not Path(storage_reference).is_absolute()
+    assert (tmp_path / Path(storage_reference)).read_bytes() == file_content

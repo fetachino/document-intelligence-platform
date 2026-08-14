@@ -11,7 +11,7 @@ High level components
   lifecycle polling, classification review, structured-field review, semantic search, and
   citation-grounded Q&A
 - Backend (FastAPI): API, DB models, document ingestion, processing orchestration, secure storage
-- Storage: local file storage adapter for dev; S3-compatible adapter planned for production
+- Storage: replaceable local-default or S3-compatible private object storage provider
 - Database: PostgreSQL with pgvector for stored embeddings and cosine retrieval
 - Worker: durable processing jobs executed by a local FastAPI background-task transport;
   distributed queue transports are planned
@@ -38,7 +38,14 @@ Database strategy
 - Schema changes are managed with Alembic migrations located in alembic/; do not rely on SQLModel.metadata.create_all() in production.
 
 Storage
-- Local file storage adapter is used for Milestone 1. Files are written off the event loop and filenames are sanitized. S3-compatible adapters will be added in a later milestone.
+- `StorageProvider` owns save, read, and delete operations using application-generated object
+  keys. Local filesystem storage remains the default development implementation.
+- The S3-compatible provider supports configurable bucket, region, endpoint, credentials, and
+  path-style addressing. SDK operations run off the event loop with bounded timeouts and retries.
+- New database references are relative object keys, not machine-specific paths. The local
+  provider can still read legacy absolute references created by earlier milestones.
+- Workers retrieve bytes through the same provider and materialize only a short-lived local file
+  for OCR libraries that require a path. Signed URLs and public object access are not implemented.
 
 Current OCR slice
 - Successful uploads enqueue document processing through a replaceable dispatcher.

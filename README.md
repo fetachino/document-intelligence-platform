@@ -17,6 +17,14 @@ Background processing
 - The current local worker uses FastAPI background tasks with bounded immediate retries;
   a distributed queue and separately scaled workers are not implemented yet.
 
+Object storage
+- Local filesystem storage remains the default through `STORAGE_BACKEND=local`.
+- `STORAGE_BACKEND=s3` enables a generic S3-compatible provider configured entirely through
+  environment variables. Custom endpoints and path-style addressing are supported for local or
+  self-hosted compatible services; no real object store is required by the test suite.
+- Stored document references are application-generated object keys. Workers read source bytes
+  through the provider rather than relying on an API-local filesystem path.
+
 Frontend document workspace
 - The React workspace lists documents and displays durable processing job history.
 - Active queued or running jobs are polled until they reach a terminal state.
