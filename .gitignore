@@ -19,6 +19,7 @@ frontend/coverage/
 uploads/
 coverage/
 htmlcov/
+pytest_tmp/
 
 # Editors and operating systems
 .vscode/

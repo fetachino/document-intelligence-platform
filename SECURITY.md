@@ -16,12 +16,17 @@ Logging
 - Include request IDs in logs.
 - Avoid logging full document contents or PII. Log only document IDs, sizes, and high-level statuses.
 
+Grounded answering
+- Answer providers receive retrieved text only; they are not given database sessions,
+  filesystem access, shell access, SQL execution, or arbitrary tools.
+- Citation provenance is assembled from stored retrieval results rather than provider output.
+
 Network and Timeouts
 - All external network calls must have sensible timeouts and retries.
 - Fail gracefully and surface clear errors to users without leaking sensitive data.
 
 Access Control
-- APIs must validate authentication and authorization (not implemented in Milestone 1).
+- Authentication and authorization are not implemented and remain planned for a later milestone.
 
 Testing
 - Mock external providers in tests.
