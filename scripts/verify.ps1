@@ -120,10 +120,10 @@ Push-Location frontend
 
 # Find npm command on Windows (npm or npm.cmd) or Unix (npm)
 $npmCmd = $null
-if (Get-Command 'npm' -ErrorAction SilentlyContinue) {
-    $npmCmd = 'npm'
-} elseif (Get-Command 'npm.cmd' -ErrorAction SilentlyContinue) {
+if (Get-Command 'npm.cmd' -ErrorAction SilentlyContinue) {
     $npmCmd = 'npm.cmd'
+} elseif (Get-Command 'npm' -ErrorAction SilentlyContinue) {
+    $npmCmd = 'npm'
 } else {
     Write-Host 'npm is not installed or not on PATH. Please install Node.js LTS and ensure npm is on PATH, then rerun verification.'
     Pop-Location
