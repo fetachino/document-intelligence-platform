@@ -8,8 +8,8 @@ Goals
 
 High level components
 - Frontend (React + TypeScript): typed API client, upload and document workspace, processing
-  lifecycle polling, classification review, structured-field review, and semantic search;
-  a citation-grounded Q&A interface is planned
+  lifecycle polling, classification review, structured-field review, semantic search, and
+  citation-grounded Q&A
 - Backend (FastAPI): API, DB models, document ingestion, processing orchestration, secure storage
 - Storage: local file storage adapter for dev; S3-compatible adapter planned for production
 - Database: PostgreSQL with pgvector for stored embeddings and cosine retrieval
@@ -118,3 +118,6 @@ Current frontend workspace slice
 - Semantic search is retrieval-only and supports global or selected-document scope. The UI
   preserves ranked chunk provenance, embedding version, and pgvector cosine distance while
   request versioning prevents older responses from replacing newer search state.
+- Grounded Q&A supports global or selected-document scope and renders backend answers,
+  insufficient-evidence status, citations, provider identifiers, and ranked retrieval context
+  without deriving confidence or provenance in the client.

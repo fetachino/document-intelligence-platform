@@ -109,6 +109,38 @@ export interface SemanticSearchResponse {
   results: SemanticSearchResult[]
 }
 
+export type QaAnswerStatus = 'answered' | 'insufficient_evidence'
+
+export interface QaRequest {
+  question: string
+  retrievalLimit: number
+  documentIds?: string[]
+}
+
+export interface QaCitation {
+  document_id: string
+  page_number: number
+  chunk_index: number
+  source_snippet: string
+  distance: number
+}
+
+export interface QaRetrievalMetadata {
+  result_count: number
+  retrieval_limit: number
+  document_ids: string[] | null
+  embedding_model: string
+  results: SemanticSearchResult[]
+}
+
+export interface QaResponse {
+  answer: string
+  status: QaAnswerStatus
+  citations: QaCitation[]
+  retrieval: QaRetrievalMetadata
+  answer_provider: string
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -187,6 +219,16 @@ export const documentApi = {
     if (documentId) params.set('document_id', documentId)
     return request<SemanticSearchResponse>(`/api/v1/search?${params.toString()}`)
   },
+  askQuestion: ({ question, retrievalLimit, documentIds }: QaRequest) =>
+    request<QaResponse>('/api/v1/qa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question,
+        retrieval_limit: retrievalLimit,
+        ...(documentIds ? { document_ids: documentIds } : {}),
+      }),
+    }),
   reprocessDocument: (documentId: string) =>
     request<ProcessingJob>(`/api/v1/documents/${encodeURIComponent(documentId)}/process`, {
       method: 'POST',

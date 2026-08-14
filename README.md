@@ -24,7 +24,8 @@ Frontend document workspace
 - Classification and structured-field review are available in the document workspace,
   including extraction provenance and append-only correction history. Semantic search supports
   all-document and selected-document retrieval with stored chunk provenance and cosine distance.
-  Q&A UI remains planned.
+  Grounded Q&A supports the same scopes and displays backend citations, retrieval context, and
+  explicit insufficient-evidence responses.
 
 Grounded Q&A API
 - `POST /api/v1/qa` accepts a question, optional document IDs, and a retrieval limit.

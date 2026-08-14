@@ -132,4 +132,51 @@ describe('documentApi', () => {
       undefined,
     )
   })
+
+  test('sends typed global and document-scoped Q&A requests', async () => {
+    const response = {
+      answer: 'Invoice 42 totals $19.00.',
+      status: 'answered',
+      citations: [],
+      retrieval: {
+        result_count: 0,
+        retrieval_limit: 5,
+        document_ids: null,
+        embedding_model: 'local_hash_v1',
+        results: [],
+      },
+      answer_provider: 'local_extractive_v1',
+    }
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(
+      new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      documentApi.askQuestion({ question: 'What is the total?', retrievalLimit: 5 }),
+    ).resolves.toEqual(response)
+    await documentApi.askQuestion({
+      question: 'What is the total?',
+      retrievalLimit: 10,
+      documentIds: ['doc/one'],
+    })
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/qa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: 'What is the total?', retrieval_limit: 5 }),
+    })
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/v1/qa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: 'What is the total?',
+        retrieval_limit: 10,
+        document_ids: ['doc/one'],
+      }),
+    })
+  })
 })

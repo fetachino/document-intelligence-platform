@@ -8,6 +8,7 @@ import {
   type ProcessingJob,
 } from './api/client'
 import { DocumentLibrary } from './components/DocumentLibrary'
+import { GroundedQa } from './components/GroundedQa'
 import { SemanticSearch } from './components/SemanticSearch'
 import {
   DocumentWorkspace,
@@ -263,6 +264,8 @@ export default function App({ pollIntervalMs = DEFAULT_POLL_INTERVAL_MS }: AppPr
       )}
 
       <SemanticSearch documents={documents} selectedDocument={selectedDocument} />
+
+      <GroundedQa documents={documents} selectedDocument={selectedDocument} />
 
       <div className="workspace-layout">
         <DocumentLibrary

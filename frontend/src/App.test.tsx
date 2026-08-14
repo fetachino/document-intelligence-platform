@@ -24,6 +24,7 @@ vi.mock('./api/client', async () => {
       getExtractionReviews: vi.fn(),
       correctStructuredField: vi.fn(),
       searchDocuments: vi.fn(),
+      askQuestion: vi.fn(),
       reprocessDocument: vi.fn(),
       uploadDocument: vi.fn(),
     },
