@@ -2,6 +2,8 @@ export type ProcessingStatus = 'uploaded' | 'processing' | 'processed' | 'failed
 export type ProcessingJobStatus = 'queued' | 'running' | 'succeeded' | 'failed'
 export type DocumentType = 'invoice' | 'resume' | 'contract' | 'other' | 'unknown'
 export type ClassificationSource = 'classifier' | 'human'
+export type StructuredExtractionStatus = 'processing' | 'completed' | 'failed'
+export type StructuredFieldReviewStatus = 'active' | 'superseded' | 'orphaned'
 
 export interface DocumentRecord {
   id: string
@@ -43,6 +45,48 @@ export interface DocumentClassification {
   classified_at: string
   updated_at: string
   reviewed_at: string | null
+}
+
+export interface StructuredField {
+  field_name: string
+  value_index: number
+  value: string
+  effective_value: string
+  reviewed: boolean
+  reviewer_id: string | null
+  reviewed_at: string | null
+  page_number: number
+  extraction_method: string
+  extractor_version: string
+}
+
+export interface StructuredExtraction {
+  document_id: string
+  document_type: DocumentType
+  status: StructuredExtractionStatus
+  extractor_version: string
+  started_at: string
+  completed_at: string | null
+  fields: StructuredField[]
+}
+
+export interface StructuredFieldCorrection {
+  id: string
+  document_id: string
+  field_name: string
+  value_index: number
+  automatic_value: string
+  previous_effective_value: string
+  corrected_value: string
+  effective_value: string | null
+  reviewer_id: string
+  created_at: string
+  status: StructuredFieldReviewStatus
+}
+
+export interface StructuredFieldReviewHistory {
+  document_id: string
+  corrections: StructuredFieldCorrection[]
 }
 
 export class ApiError extends Error {
@@ -93,6 +137,29 @@ export const documentApi = {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ document_type: documentType }),
+      },
+    ),
+  getExtraction: (documentId: string) =>
+    request<StructuredExtraction>(
+      `/api/v1/documents/${encodeURIComponent(documentId)}/extraction`,
+    ),
+  getExtractionReviews: (documentId: string) =>
+    request<StructuredFieldReviewHistory>(
+      `/api/v1/documents/${encodeURIComponent(documentId)}/extraction/reviews`,
+    ),
+  correctStructuredField: (
+    documentId: string,
+    fieldName: string,
+    valueIndex: number,
+    value: string,
+    reviewerId: string,
+  ) =>
+    request<StructuredField>(
+      `/api/v1/documents/${encodeURIComponent(documentId)}/extraction/fields/${encodeURIComponent(fieldName)}/${valueIndex}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value, reviewer_id: reviewerId }),
       },
     ),
   reprocessDocument: (documentId: string) =>

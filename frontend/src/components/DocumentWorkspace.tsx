@@ -7,6 +7,7 @@ import type {
 } from '../api/client'
 import { ClassificationReview } from './ClassificationReview'
 import { StatusBadge } from './StatusBadge'
+import { StructuredFieldReview } from './StructuredFieldReview'
 
 interface DocumentWorkspaceProps {
   document: DocumentRecord | null
@@ -97,6 +98,8 @@ export function DocumentWorkspace({
         feedback={classificationFeedback}
         onCorrect={onCorrectClassification}
       />
+
+      <StructuredFieldReview documentId={document.id} />
 
       <section className="job-section">
         <div className="section-heading">

@@ -8,8 +8,8 @@ Goals
 
 High level components
 - Frontend (React + TypeScript): typed API client, upload and document workspace, processing
-  lifecycle polling, and classification review; field review, search, and citation-grounded
-  Q&A interfaces are planned
+  lifecycle polling, classification review, and structured-field review; search and
+  citation-grounded Q&A interfaces are planned
 - Backend (FastAPI): API, DB models, document ingestion, processing orchestration, secure storage
 - Storage: local file storage adapter for dev; S3-compatible adapter planned for production
 - Database: PostgreSQL with pgvector for stored embeddings and cosine retrieval
@@ -112,3 +112,6 @@ Current frontend workspace slice
   supplies the backend service target without exposing backend addresses to UI components.
 - Classification state is loaded per selected document. Human corrections use the existing
   review API, preserve the automatic prediction, and refresh the persisted effective type.
+- Structured extraction and correction history are loaded together per selected document.
+  Field corrections preserve automatic values and provenance while displaying the backend's
+  active, superseded, and orphaned audit statuses without client-side reinterpretation.

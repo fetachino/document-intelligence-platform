@@ -63,6 +63,37 @@ button { letter-spacing: 0; }
 .classification-review-controls { display: flex; align-items: center; gap: 10px; }
 .classification-review-controls select { min-width: 180px; min-height: 38px; padding: 7px 30px 7px 10px; color: #263442; background: #fff; border: 1px solid #aebbc5; border-radius: 4px; }
 .classification-timestamps { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px 20px; color: #6a7a87; font-size: .78rem; }
+.structured-review-section { padding: 28px 0; border-bottom: 1px solid #ccd5dc; }
+.extraction-status, .review-status { padding: 4px 7px; border-radius: 3px; font-size: .75rem; font-weight: 800; }
+.extraction-status-processing { color: #075a73; background: #dceff5; }
+.extraction-status-completed, .review-status-active { color: #17613e; background: #dff2e7; }
+.extraction-status-failed, .review-status-orphaned { color: #922f3b; background: #f9e1e5; }
+.review-status-superseded { color: #43586a; background: #e6ebef; }
+.extraction-metadata { display: flex; flex-wrap: wrap; gap: 8px 24px; color: #637482; font-size: .82rem; }
+.extraction-metadata strong { margin-left: 4px; color: #263442; }
+.reviewer-field { max-width: 320px; margin: 22px 0; display: grid; gap: 7px; }
+.reviewer-field span, .field-correction-controls label { color: #526573; font-size: .78rem; font-weight: 700; }
+.reviewer-field input, .field-correction-controls input { min-width: 0; min-height: 38px; padding: 7px 10px; color: #263442; background: #fff; border: 1px solid #aebbc5; border-radius: 4px; }
+.structured-field-groups { border-top: 1px solid #ccd5dc; }
+.structured-field-group { padding: 20px 0 4px; border-bottom: 1px solid #d9e0e5; }
+.structured-field-group h4, .review-history h4 { margin: 0; font-size: .95rem; letter-spacing: 0; }
+.structured-field-row { padding: 14px 0 18px; }
+.structured-field-row + .structured-field-row { border-top: 1px dashed #d9e0e5; }
+.field-values { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(160px, 1fr) auto; align-items: start; gap: 14px; }
+.field-values > div { min-width: 0; display: grid; gap: 4px; }
+.field-values > div span, .value-index { color: #6a7a87; font-size: .73rem; text-transform: uppercase; letter-spacing: .06em; }
+.field-values > div strong { overflow-wrap: anywhere; }
+.value-index { grid-column: 1 / -1; }
+.field-provenance { margin: 10px 0 0; color: #637482; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .75rem; }
+.field-correction-controls { margin-top: 12px; display: grid; grid-template-columns: minmax(160px, 1fr) auto; align-items: end; gap: 7px 10px; }
+.field-correction-controls label { grid-column: 1 / -1; }
+.review-history { padding-top: 28px; }
+.review-history-list { border-top: 1px solid #ccd5dc; }
+.review-history-row { min-height: 84px; padding: 13px 0; display: grid; grid-template-columns: minmax(130px, .7fr) minmax(200px, 1fr) minmax(170px, .8fr) auto; align-items: center; gap: 16px; border-bottom: 1px solid #d9e0e5; }
+.review-history-row > div { min-width: 0; display: grid; gap: 4px; }
+.review-history-row span { color: #657583; font-size: .78rem; overflow-wrap: anywhere; }
+.history-change strong { overflow-wrap: anywhere; }
+.review-status { justify-self: end; }
 .job-section { padding-top: 28px; }
 .job-list { border-top: 1px solid #ccd5dc; }
 .job-row { min-height: 76px; padding: 14px 0; display: grid; grid-template-columns: minmax(180px, .8fr) minmax(220px, 1fr) minmax(120px, auto); align-items: center; gap: 20px; border-bottom: 1px solid #d9e0e5; }
@@ -89,6 +120,10 @@ button { letter-spacing: 0; }
   .document-library { border-right: 0; border-bottom: 1px solid #d7dee4; }
   .metadata-band { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .classification-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .field-values { grid-template-columns: 1fr 1fr; }
+  .field-values .review-indicator { grid-column: 1 / -1; }
+  .review-history-row { grid-template-columns: 1fr 1fr; }
+  .review-status { justify-self: start; }
   .job-row { grid-template-columns: 1fr; gap: 8px; }
   .error-code { justify-self: start; }
 }
@@ -100,5 +135,7 @@ button { letter-spacing: 0; }
   .classification-summary { grid-template-columns: 1fr; }
   .classification-review-controls { align-items: stretch; flex-direction: column; }
   .classification-review-controls select, .classification-review-controls .button { width: 100%; }
+  .field-values, .field-correction-controls, .review-history-row { grid-template-columns: 1fr; }
+  .field-correction-controls label, .field-values .review-indicator { grid-column: 1; }
   .document-workspace { padding: 22px 18px; }
 }

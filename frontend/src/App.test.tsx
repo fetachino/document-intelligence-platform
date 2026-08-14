@@ -20,6 +20,9 @@ vi.mock('./api/client', async () => {
       listJobs: vi.fn(),
       getClassification: vi.fn(),
       updateClassification: vi.fn(),
+      getExtraction: vi.fn(),
+      getExtractionReviews: vi.fn(),
+      correctStructuredField: vi.fn(),
       reprocessDocument: vi.fn(),
       uploadDocument: vi.fn(),
     },
@@ -85,6 +88,13 @@ beforeEach(() => {
   vi.mocked(documentApi.listJobs).mockResolvedValue([])
   vi.mocked(documentApi.getClassification).mockResolvedValue(automaticClassification)
   vi.mocked(documentApi.updateClassification).mockResolvedValue(reviewedClassification)
+  vi.mocked(documentApi.getExtraction).mockRejectedValue(
+    new ApiError('structured_extraction_not_found', 404, 'structured_extraction_not_found'),
+  )
+  vi.mocked(documentApi.getExtractionReviews).mockResolvedValue({
+    document_id: 'doc-1',
+    corrections: [],
+  })
   vi.mocked(documentApi.reprocessDocument).mockResolvedValue(job('queued', 'job-new'))
 })
 

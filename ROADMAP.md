@@ -27,7 +27,8 @@ Milestone 2 - Complete and verified
 Milestone 3 (in progress)
 - Document library, processing lifecycle, and reprocessing frontend foundation (implemented)
 - Classification review frontend workflow (implemented)
-- Structured-field correction, search, and grounded Q&A frontend workflows
+- Structured-field correction and review-history frontend workflow (implemented)
+- Search and grounded Q&A frontend workflows
 - Observable worker/job architecture with replaceable dispatcher (local slice implemented)
 - Distributed worker transport and scaling (Celery/RQ or equivalent, planned)
 - Kubernetes deployment architecture (planned)

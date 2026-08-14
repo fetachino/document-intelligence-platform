@@ -21,8 +21,9 @@ Frontend document workspace
 - The React workspace lists documents and displays durable processing job history.
 - Active queued or running jobs are polled until they reach a terminal state.
 - Reprocessing is guarded while active work exists and exposes stable backend error codes.
-- Classification review is available in the document workspace; structured-field correction,
-  search, and Q&A UI remain planned.
+- Classification and structured-field review are available in the document workspace,
+  including extraction provenance and append-only correction history. Search and Q&A UI
+  remain planned.
 
 Grounded Q&A API
 - `POST /api/v1/qa` accepts a question, optional document IDs, and a retrieval limit.

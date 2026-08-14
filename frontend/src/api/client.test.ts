@@ -67,4 +67,38 @@ describe('documentApi', () => {
       body: JSON.stringify({ document_type: 'contract' }),
     })
   })
+
+  test('centralizes structured-field correction requests', async () => {
+    const field = {
+      field_name: 'total_amount',
+      value_index: 0,
+      value: '$10.00',
+      effective_value: '$12.00',
+      reviewed: true,
+      reviewer_id: 'reviewer-a',
+      reviewed_at: '2026-08-14T10:01:00',
+      page_number: 1,
+      extraction_method: 'local_regex',
+      extractor_version: 'local_regex_v1',
+    }
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(field), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      documentApi.correctStructuredField('doc/one', 'total amount', 0, '$12.00', 'reviewer-a'),
+    ).resolves.toEqual(field)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/documents/doc%2Fone/extraction/fields/total%20amount/0',
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: '$12.00', reviewer_id: 'reviewer-a' }),
+      },
+    )
+  })
 })
