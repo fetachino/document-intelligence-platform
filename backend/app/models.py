@@ -1,8 +1,23 @@
-﻿from sqlmodel import SQLModel, Field
-from typing import Optional
-from datetime import datetime
-from enum import Enum
 import uuid
+from datetime import UTC, datetime
+from enum import Enum
+from typing import Optional
+
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    Enum as SQLAlchemyEnum,
+    ForeignKeyConstraint,
+    Index,
+    Text,
+)
+from sqlmodel import Field, SQLModel
+
+
+def utc_now() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
 
 class ProcessingStatus(str, Enum):
     uploaded = "uploaded"
@@ -10,12 +25,300 @@ class ProcessingStatus(str, Enum):
     processed = "processed"
     failed = "failed"
 
+
+class ExtractionMethod(str, Enum):
+    native = "native"
+    ocr = "ocr"
+
+
+class DocumentType(str, Enum):
+    invoice = "invoice"
+    resume = "resume"
+    contract = "contract"
+    other = "other"
+    unknown = "unknown"
+
+
+class ClassificationSource(str, Enum):
+    classifier = "classifier"
+    human = "human"
+
+
+class StructuredExtractionStatus(str, Enum):
+    processing = "processing"
+    completed = "completed"
+    failed = "failed"
+
+
+class StructuredFieldReviewStatus(str, Enum):
+    active = "active"
+    superseded = "superseded"
+    orphaned = "orphaned"
+
+
 class Document(SQLModel, table=True):
-    id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    id: Optional[str] = Field(
+        default_factory=lambda: str(uuid.uuid4()), primary_key=True
+    )
     filename: str
     content_type: str
     size: int
     storage_path: str
-    status: ProcessingStatus = ProcessingStatus.uploaded
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    status: ProcessingStatus = Field(
+        default=ProcessingStatus.uploaded,
+        sa_column=Column(
+            SQLAlchemyEnum(
+                ProcessingStatus, native_enum=False, create_constraint=False
+            ),
+            nullable=False,
+        ),
+    )
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class DocumentPage(SQLModel, table=True):
+    __tablename__ = "document_page"
+    __table_args__ = (
+        CheckConstraint("page_number > 0", name="ck_document_page_number_positive"),
+    )
+
+    document_id: str = Field(
+        foreign_key="document.id", ondelete="CASCADE", primary_key=True
+    )
+    page_number: int = Field(primary_key=True)
+    text: str = Field(sa_column=Column(Text, nullable=False))
+    extraction_method: ExtractionMethod = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(
+                ExtractionMethod, native_enum=False, create_constraint=False
+            ),
+            nullable=False,
+        )
+    )
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class DocumentClassification(SQLModel, table=True):
+    __tablename__ = "document_classification"
+
+    document_id: str = Field(
+        foreign_key="document.id", ondelete="CASCADE", primary_key=True
+    )
+    predicted_type: DocumentType = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(DocumentType, native_enum=False, create_constraint=False),
+            nullable=False,
+        )
+    )
+    effective_type: DocumentType = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(DocumentType, native_enum=False, create_constraint=False),
+            nullable=False,
+        )
+    )
+    source: ClassificationSource = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(
+                ClassificationSource, native_enum=False, create_constraint=False
+            ),
+            nullable=False,
+        )
+    )
+    classifier_version: str
+    classified_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+    reviewed_at: Optional[datetime] = None
+
+
+class DocumentClassificationReview(SQLModel, table=True):
+    __tablename__ = "document_classification_review"
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    document_id: str = Field(
+        foreign_key="document.id", ondelete="CASCADE", index=True
+    )
+    previous_type: DocumentType = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(DocumentType, native_enum=False, create_constraint=False),
+            nullable=False,
+        )
+    )
+    corrected_type: DocumentType = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(DocumentType, native_enum=False, create_constraint=False),
+            nullable=False,
+        )
+    )
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class ClassificationReviewRequest(SQLModel):
+    document_type: DocumentType
+
+
+class DocumentStructuredExtraction(SQLModel, table=True):
+    __tablename__ = "document_structured_extraction"
+
+    document_id: str = Field(
+        foreign_key="document.id", ondelete="CASCADE", primary_key=True
+    )
+    document_type: DocumentType = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(DocumentType, native_enum=False, create_constraint=False),
+            nullable=False,
+        )
+    )
+    status: StructuredExtractionStatus = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(
+                StructuredExtractionStatus,
+                native_enum=False,
+                create_constraint=False,
+            ),
+            nullable=False,
+        )
+    )
+    extractor_version: str
+    started_at: datetime = Field(default_factory=utc_now)
+    completed_at: Optional[datetime] = None
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class DocumentStructuredField(SQLModel, table=True):
+    __tablename__ = "document_structured_field"
+    __table_args__ = (
+        CheckConstraint("page_number > 0", name="ck_structured_field_page_positive"),
+        CheckConstraint(
+            "value_index >= 0", name="ck_structured_field_value_index_nonnegative"
+        ),
+    )
+
+    document_id: str = Field(
+        foreign_key="document_structured_extraction.document_id",
+        ondelete="CASCADE",
+        primary_key=True,
+    )
+    field_name: str = Field(primary_key=True)
+    value_index: int = Field(primary_key=True)
+    value: str = Field(sa_column=Column(Text, nullable=False))
+    page_number: int
+    extraction_method: str
+    extractor_version: str
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class DocumentStructuredFieldCorrection(SQLModel, table=True):
+    __tablename__ = "document_structured_field_correction"
+    __table_args__ = (
+        CheckConstraint(
+            "value_index >= 0",
+            name="ck_structured_field_correction_value_index_nonnegative",
+        ),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    document_id: str = Field(
+        foreign_key="document_structured_extraction.document_id",
+        ondelete="CASCADE",
+        index=True,
+    )
+    field_name: str
+    value_index: int
+    automatic_value: str = Field(sa_column=Column(Text, nullable=False))
+    previous_effective_value: str = Field(sa_column=Column(Text, nullable=False))
+    corrected_value: str = Field(sa_column=Column(Text, nullable=False))
+    reviewer_id: str
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class DocumentChunk(SQLModel, table=True):
+    __tablename__ = "document_chunk"
+    __table_args__ = (
+        CheckConstraint("page_number > 0", name="ck_document_chunk_page_positive"),
+        CheckConstraint(
+            "chunk_index >= 0", name="ck_document_chunk_index_nonnegative"
+        ),
+        ForeignKeyConstraint(
+            ["document_id", "page_number"],
+            ["document_page.document_id", "document_page.page_number"],
+            ondelete="CASCADE",
+        ),
+        Index(
+            "ix_document_chunk_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+    )
+
+    document_id: str = Field(primary_key=True)
+    page_number: int = Field(primary_key=True)
+    chunk_index: int = Field(primary_key=True)
+    text: str = Field(sa_column=Column(Text, nullable=False))
+    embedding: list[float] = Field(
+        sa_column=Column(Vector(128), nullable=False)
+    )
+    embedding_model: str
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class StructuredFieldCorrectionRequest(SQLModel):
+    value: str = Field(min_length=1, max_length=2000)
+    reviewer_id: str = Field(min_length=1, max_length=100)
+
+
+class StructuredFieldResponse(SQLModel):
+    field_name: str
+    value_index: int
+    value: str
+    effective_value: str
+    reviewed: bool = False
+    reviewer_id: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    page_number: int
+    extraction_method: str
+    extractor_version: str
+
+
+class StructuredExtractionResponse(SQLModel):
+    document_id: str
+    document_type: DocumentType
+    status: StructuredExtractionStatus
+    extractor_version: str
+    started_at: datetime
+    completed_at: Optional[datetime]
+    fields: list[StructuredFieldResponse] = Field(default_factory=list)
+
+
+class StructuredFieldCorrectionResponse(SQLModel):
+    id: str
+    document_id: str
+    field_name: str
+    value_index: int
+    automatic_value: str
+    previous_effective_value: str
+    corrected_value: str
+    effective_value: Optional[str]
+    reviewer_id: str
+    created_at: datetime
+    status: StructuredFieldReviewStatus
+
+
+class StructuredFieldReviewHistoryResponse(SQLModel):
+    document_id: str
+    corrections: list[StructuredFieldCorrectionResponse] = Field(default_factory=list)
+
+
+class SemanticSearchResult(SQLModel):
+    document_id: str
+    page_number: int
+    chunk_index: int
+    text: str
+    embedding_model: str
+    distance: float
+
+
+class SemanticSearchResponse(SQLModel):
+    query: str
+    results: list[SemanticSearchResult] = Field(default_factory=list)

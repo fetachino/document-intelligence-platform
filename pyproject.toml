@@ -16,6 +16,12 @@ asyncpg = "^0.29.0"
 python-multipart = "^0.0.6"
 python-dotenv = "^1.0"
 alembic = "^1.11.0"
+pypdf = "^6.16.1"
+pypdfium2 = "^5.13.0"
+pytesseract = "^0.3.13"
+pillow = "^12.3.0"
+python-docx = "^1.2.0"
+pgvector = "^0.4.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
