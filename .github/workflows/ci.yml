@@ -47,7 +47,7 @@ jobs:
 
       - name: Type checking
         run: |
-          poetry run mypy backend || true
+          poetry run mypy backend
 
       - name: Run Alembic migrations and backend tests
         env:
@@ -60,12 +60,12 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
-          npm run lint || true
-          npm run typecheck || true
-          npm run test -- --coverage || true
-          npm run build || true
+          npm run lint
+          npm run typecheck
+          npm run test -- --run --coverage
+          npm run build
 
       - name: Build Docker images
         run: |
           docker build -f ./backend/Dockerfile -t dip-backend .
-          docker build -t dip-frontend ./frontend
+          docker build -f ./frontend/Dockerfile -t dip-frontend .
