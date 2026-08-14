@@ -1,5 +1,11 @@
 import React from 'react'
-import type { DocumentRecord, ProcessingJob } from '../api/client'
+import type {
+  DocumentClassification,
+  DocumentRecord,
+  DocumentType,
+  ProcessingJob,
+} from '../api/client'
+import { ClassificationReview } from './ClassificationReview'
 import { StatusBadge } from './StatusBadge'
 
 interface DocumentWorkspaceProps {
@@ -9,7 +15,13 @@ interface DocumentWorkspaceProps {
   jobsError: string | null
   reprocessing: boolean
   feedback: WorkspaceFeedback | null
+  classification: DocumentClassification | null
+  classificationLoading: boolean
+  classificationError: string | null
+  classificationCorrecting: boolean
+  classificationFeedback: WorkspaceFeedback | null
   onReprocess: () => void
+  onCorrectClassification: (documentType: DocumentType) => void
 }
 
 export interface WorkspaceFeedback {
@@ -24,7 +36,13 @@ export function DocumentWorkspace({
   jobsError,
   reprocessing,
   feedback,
+  classification,
+  classificationLoading,
+  classificationError,
+  classificationCorrecting,
+  classificationFeedback,
   onReprocess,
+  onCorrectClassification,
 }: DocumentWorkspaceProps) {
   if (!document) {
     return (
@@ -70,6 +88,15 @@ export function DocumentWorkspace({
         <Metadata label="Uploaded">{formatDate(document.created_at)}</Metadata>
         <Metadata label="Updated">{formatDate(document.updated_at)}</Metadata>
       </section>
+
+      <ClassificationReview
+        classification={classification}
+        loading={classificationLoading}
+        error={classificationError}
+        correcting={classificationCorrecting}
+        feedback={classificationFeedback}
+        onCorrect={onCorrectClassification}
+      />
 
       <section className="job-section">
         <div className="section-heading">

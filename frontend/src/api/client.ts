@@ -1,5 +1,7 @@
 export type ProcessingStatus = 'uploaded' | 'processing' | 'processed' | 'failed'
 export type ProcessingJobStatus = 'queued' | 'running' | 'succeeded' | 'failed'
+export type DocumentType = 'invoice' | 'resume' | 'contract' | 'other' | 'unknown'
+export type ClassificationSource = 'classifier' | 'human'
 
 export interface DocumentRecord {
   id: string
@@ -30,6 +32,17 @@ export interface UploadResponse {
   filename: string
   status: ProcessingStatus
   job_id: string
+}
+
+export interface DocumentClassification {
+  document_id: string
+  predicted_type: DocumentType
+  effective_type: DocumentType
+  source: ClassificationSource
+  classifier_version: string
+  classified_at: string
+  updated_at: string
+  reviewed_at: string | null
 }
 
 export class ApiError extends Error {
@@ -69,6 +82,19 @@ export const documentApi = {
   listDocuments: () => request<DocumentRecord[]>('/api/v1/documents/'),
   listJobs: (documentId: string) =>
     request<ProcessingJob[]>(`/api/v1/documents/${encodeURIComponent(documentId)}/jobs`),
+  getClassification: (documentId: string) =>
+    request<DocumentClassification>(
+      `/api/v1/documents/${encodeURIComponent(documentId)}/classification`,
+    ),
+  updateClassification: (documentId: string, documentType: DocumentType) =>
+    request<DocumentClassification>(
+      `/api/v1/documents/${encodeURIComponent(documentId)}/classification`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document_type: documentType }),
+      },
+    ),
   reprocessDocument: (documentId: string) =>
     request<ProcessingJob>(`/api/v1/documents/${encodeURIComponent(documentId)}/process`, {
       method: 'POST',

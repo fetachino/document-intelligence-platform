@@ -5,6 +5,7 @@ import App from './App'
 import {
   ApiError,
   documentApi,
+  type DocumentClassification,
   type DocumentRecord,
   type ProcessingJob,
   type ProcessingJobStatus,
@@ -17,6 +18,8 @@ vi.mock('./api/client', async () => {
     documentApi: {
       listDocuments: vi.fn(),
       listJobs: vi.fn(),
+      getClassification: vi.fn(),
+      updateClassification: vi.fn(),
       reprocessDocument: vi.fn(),
       uploadDocument: vi.fn(),
     },
@@ -43,6 +46,25 @@ const documentTwo: DocumentRecord = {
   status: 'uploaded',
 }
 
+const automaticClassification: DocumentClassification = {
+  document_id: 'doc-1',
+  predicted_type: 'invoice',
+  effective_type: 'invoice',
+  source: 'classifier',
+  classifier_version: 'local_keyword_v1',
+  classified_at: '2026-08-14T10:01:00',
+  updated_at: '2026-08-14T10:01:00',
+  reviewed_at: null,
+}
+
+const reviewedClassification: DocumentClassification = {
+  ...automaticClassification,
+  effective_type: 'contract',
+  source: 'human',
+  updated_at: '2026-08-14T10:03:00',
+  reviewed_at: '2026-08-14T10:03:00',
+}
+
 function job(status: ProcessingJobStatus, id = `job-${status}`): ProcessingJob {
   return {
     id,
@@ -61,6 +83,8 @@ function job(status: ProcessingJobStatus, id = `job-${status}`): ProcessingJob {
 beforeEach(() => {
   vi.mocked(documentApi.listDocuments).mockResolvedValue([documentOne, documentTwo])
   vi.mocked(documentApi.listJobs).mockResolvedValue([])
+  vi.mocked(documentApi.getClassification).mockResolvedValue(automaticClassification)
+  vi.mocked(documentApi.updateClassification).mockResolvedValue(reviewedClassification)
   vi.mocked(documentApi.reprocessDocument).mockResolvedValue(job('queued', 'job-new'))
 })
 
@@ -168,6 +192,128 @@ describe('document workspace', () => {
 
     expect(await screen.findByText('invoice-august.pdf')).toBeInTheDocument()
     expect(documentApi.listDocuments).toHaveBeenCalledTimes(2)
+  })
+
+  test('renders the automatic and effective classification', async () => {
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /invoice-august\.pdf/i }))
+
+    expect(await screen.findByText('Automatic prediction')).toBeInTheDocument()
+    expect(screen.getByText('Automatic prediction').parentElement).toHaveTextContent('Invoice')
+    expect(screen.getByText('Effective classification').parentElement).toHaveTextContent('Invoice')
+    expect(screen.getByText('Source').parentElement).toHaveTextContent('Classifier')
+    expect(screen.getByText('local_keyword_v1')).toBeInTheDocument()
+  })
+
+  test('identifies a reviewed classification override', async () => {
+    vi.mocked(documentApi.getClassification).mockResolvedValue(reviewedClassification)
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /invoice-august\.pdf/i }))
+
+    expect(await screen.findByText('Human override')).toBeInTheDocument()
+    expect(screen.getByText('Automatic prediction').parentElement).toHaveTextContent('Invoice')
+    expect(screen.getByText('Effective classification').parentElement).toHaveTextContent('Contract')
+    expect(screen.getByText('Source').parentElement).toHaveTextContent('Human')
+  })
+
+  test('submits and refreshes a classification correction', async () => {
+    vi.mocked(documentApi.getClassification)
+      .mockResolvedValueOnce(automaticClassification)
+      .mockResolvedValueOnce(reviewedClassification)
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /invoice-august\.pdf/i }))
+    await screen.findByText('Automatic prediction')
+
+    fireEvent.change(screen.getByLabelText('Correct classification'), {
+      target: { value: 'contract' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save correction' }))
+
+    expect(await screen.findByText('Classification correction saved.')).toBeInTheDocument()
+    expect(documentApi.updateClassification).toHaveBeenCalledWith('doc-1', 'contract')
+    expect(documentApi.getClassification).toHaveBeenCalledTimes(2)
+    expect(screen.getByText('Effective classification').parentElement).toHaveTextContent('Contract')
+  })
+
+  test('guards a duplicate classification correction', async () => {
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /invoice-august\.pdf/i }))
+
+    expect(await screen.findByRole('button', { name: 'Save correction' })).toBeDisabled()
+    expect(documentApi.updateClassification).not.toHaveBeenCalled()
+  })
+
+  test('surfaces correction API errors without changing the effective type', async () => {
+    vi.mocked(documentApi.updateClassification).mockRejectedValue(
+      new ApiError('classification correction rejected', 422),
+    )
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /invoice-august\.pdf/i }))
+    await screen.findByText('Automatic prediction')
+
+    fireEvent.change(screen.getByLabelText('Correct classification'), {
+      target: { value: 'contract' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save correction' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('classification correction rejected')
+    expect(screen.getByText('Effective classification').parentElement).toHaveTextContent('Invoice')
+  })
+
+  test('shows classification loading state', async () => {
+    let resolveClassification: (value: DocumentClassification) => void = () => undefined
+    vi.mocked(documentApi.getClassification).mockReturnValue(
+      new Promise((resolve) => {
+        resolveClassification = resolve
+      }),
+    )
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /invoice-august\.pdf/i }))
+
+    expect(await screen.findByText('Loading classification...')).toBeInTheDocument()
+    await act(async () => resolveClassification(automaticClassification))
+  })
+
+  test('handles missing classification state without treating it as a failure', async () => {
+    vi.mocked(documentApi.getClassification).mockRejectedValue(
+      new ApiError('classification_not_found', 404, 'classification_not_found'),
+    )
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /invoice-august\.pdf/i }))
+
+    expect(await screen.findByText('Classification is not available yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  test('clears stale classification state when the selected document changes', async () => {
+    let resolveSecondClassification: (value: DocumentClassification) => void = () => undefined
+    vi.mocked(documentApi.getClassification)
+      .mockResolvedValueOnce(automaticClassification)
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSecondClassification = resolve
+        }),
+      )
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /invoice-august\.pdf/i }))
+    await screen.findByText('Automatic prediction')
+
+    fireEvent.click(screen.getByRole('button', { name: /resume\.docx/i }))
+
+    expect(await screen.findByText('Loading classification...')).toBeInTheDocument()
+    expect(screen.queryByText('Automatic prediction')).not.toBeInTheDocument()
+    await act(async () => {
+      resolveSecondClassification({
+        ...automaticClassification,
+        document_id: 'doc-2',
+        predicted_type: 'resume',
+        effective_type: 'resume',
+      })
+    })
   })
 })
 

@@ -1,5 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { ApiError, documentApi, type DocumentRecord, type ProcessingJob } from './api/client'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  ApiError,
+  documentApi,
+  type DocumentClassification,
+  type DocumentRecord,
+  type DocumentType,
+  type ProcessingJob,
+} from './api/client'
 import { DocumentLibrary } from './components/DocumentLibrary'
 import {
   DocumentWorkspace,
@@ -26,6 +33,13 @@ export default function App({ pollIntervalMs = DEFAULT_POLL_INTERVAL_MS }: AppPr
   const [uploadFeedback, setUploadFeedback] = useState<WorkspaceFeedback | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [classification, setClassification] = useState<DocumentClassification | null>(null)
+  const [classificationLoading, setClassificationLoading] = useState(false)
+  const [classificationError, setClassificationError] = useState<string | null>(null)
+  const [classificationCorrecting, setClassificationCorrecting] = useState(false)
+  const [classificationFeedback, setClassificationFeedback] =
+    useState<WorkspaceFeedback | null>(null)
+  const classificationRequestVersion = useRef(0)
 
   const selectedDocument = useMemo(
     () => documents.find((document) => document.id === selectedDocumentId) ?? null,
@@ -66,6 +80,40 @@ export default function App({ pollIntervalMs = DEFAULT_POLL_INTERVAL_MS }: AppPr
     setFeedback(null)
     if (selectedDocumentId) void loadJobs(selectedDocumentId, true)
   }, [selectedDocumentId, loadJobs])
+
+  useEffect(() => {
+    const requestVersion = ++classificationRequestVersion.current
+    setClassification(null)
+    setClassificationError(null)
+    setClassificationFeedback(null)
+    setClassificationCorrecting(false)
+    setClassificationLoading(Boolean(selectedDocumentId))
+    if (!selectedDocumentId) return
+
+    void documentApi.getClassification(selectedDocumentId).then(
+      (loadedClassification) => {
+        if (classificationRequestVersion.current !== requestVersion) return
+        setClassification(loadedClassification)
+        setClassificationLoading(false)
+      },
+      (error: unknown) => {
+        if (classificationRequestVersion.current !== requestVersion) return
+        setClassificationError(
+          error instanceof ApiError && error.detail === 'classification_not_found'
+            ? null
+            : errorMessage(error, 'Could not load classification.'),
+        )
+        setClassificationLoading(false)
+      },
+    )
+
+    return () => {
+      // Invalidating the request prevents a late response from a prior selection being rendered.
+      if (classificationRequestVersion.current === requestVersion) {
+        classificationRequestVersion.current += 1
+      }
+    }
+  }, [selectedDocumentId])
 
   useEffect(() => {
     if (!selectedDocumentId || !hasActiveJob) return
@@ -111,6 +159,51 @@ export default function App({ pollIntervalMs = DEFAULT_POLL_INTERVAL_MS }: AppPr
       })
     } finally {
       setReprocessing(false)
+    }
+  }
+
+  async function correctClassification(documentType: DocumentType) {
+    if (
+      !selectedDocumentId ||
+      !classification ||
+      classification.document_id !== selectedDocumentId ||
+      classification.effective_type === documentType ||
+      classificationCorrecting
+    ) return
+
+    const documentId = selectedDocumentId
+    const requestVersion = classificationRequestVersion.current
+    setClassificationCorrecting(true)
+    setClassificationFeedback(null)
+
+    try {
+      const updated = await documentApi.updateClassification(documentId, documentType)
+      if (classificationRequestVersion.current !== requestVersion) return
+      setClassification(updated)
+
+      try {
+        const refreshed = await documentApi.getClassification(documentId)
+        if (classificationRequestVersion.current !== requestVersion) return
+        setClassification(refreshed)
+        setClassificationError(null)
+        setClassificationFeedback({ message: 'Classification correction saved.', kind: 'success' })
+      } catch (error) {
+        if (classificationRequestVersion.current !== requestVersion) return
+        setClassificationFeedback({
+          message: errorMessage(error, 'Correction saved, but classification could not be refreshed.'),
+          kind: 'error',
+        })
+      }
+    } catch (error) {
+      if (classificationRequestVersion.current !== requestVersion) return
+      setClassificationFeedback({
+        message: errorMessage(error, 'Could not save classification correction.'),
+        kind: 'error',
+      })
+    } finally {
+      if (classificationRequestVersion.current === requestVersion) {
+        setClassificationCorrecting(false)
+      }
     }
   }
 
@@ -184,7 +277,15 @@ export default function App({ pollIntervalMs = DEFAULT_POLL_INTERVAL_MS }: AppPr
           jobsError={jobsError}
           reprocessing={reprocessing}
           feedback={feedback}
+          classification={
+            classification?.document_id === selectedDocumentId ? classification : null
+          }
+          classificationLoading={classificationLoading}
+          classificationError={classificationError}
+          classificationCorrecting={classificationCorrecting}
+          classificationFeedback={classificationFeedback}
           onReprocess={() => void reprocess()}
+          onCorrectClassification={(documentType) => void correctClassification(documentType)}
         />
       </div>
     </div>
