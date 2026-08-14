@@ -16,6 +16,11 @@ Logging
 - Include request IDs in logs.
 - Avoid logging full document contents or PII. Log only document IDs, sizes, and high-level statuses.
 
+Background jobs
+- Job failures persist stable error codes, not exception text or document content.
+- Active jobs are claimed by ID and do not grant workers arbitrary SQL, filesystem, shell,
+  or tool access beyond the existing document processor dependencies.
+
 Grounded answering
 - Answer providers receive retrieved text only; they are not given database sessions,
   filesystem access, shell access, SQL execution, or arbitrary tools.

@@ -12,7 +12,8 @@ High level components
 - Backend (FastAPI): API, DB models, document ingestion, processing orchestration, secure storage
 - Storage: local file storage adapter for dev; S3-compatible adapter planned for production
 - Database: PostgreSQL with pgvector for stored embeddings and cosine retrieval
-- Worker: local FastAPI background tasks; distributed workers are planned
+- Worker: durable processing jobs executed by a local FastAPI background-task transport;
+  distributed queue transports are planned
 - Providers: replaceable local OCR, classification, extraction, embedding, and answer
   implementations; external providers are planned
 
@@ -91,3 +92,13 @@ Current grounded Q&A and evaluation slice
 - Responses include citations and the ranked retrieval set with pgvector distances.
 - The checked-in synthetic evaluation dataset measures answer status, expected content,
   citations, provenance grounding, and retrieval relevance for local development only.
+
+Current background worker slice
+- `DocumentJobDispatcher` persists an explicit job before handing its ID to a transport.
+- `DocumentJobWorker` claims queued work atomically, runs the existing idempotent document
+  processor, and records terminal state without exposing document text in errors.
+- Jobs expose queued, running, succeeded, and failed states, timestamps, bounded attempt
+  counts, and stable error codes. Re-enqueueing active work returns the existing job;
+  reprocessing after a terminal job creates a new history record.
+- FastAPI `BackgroundTasks` remains the local development transport. Celery, RQ, separate
+  worker services, scheduling, and distributed recovery semantics are not implemented.

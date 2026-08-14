@@ -18,10 +18,12 @@ from ..models import (
     DocumentClassification,
     DocumentClassificationReview,
     DocumentPage,
+    DocumentProcessingJob,
     DocumentStructuredExtraction,
     DocumentStructuredField,
     DocumentStructuredFieldCorrection,
     ProcessingStatus,
+    ProcessingJobResponse,
     StructuredExtractionResponse,
     StructuredFieldCorrectionRequest,
     StructuredFieldCorrectionResponse,
@@ -85,11 +87,12 @@ async def upload_document(
 
     document_id = str(document.id)
     logging.info("Stored document id=%s", document_id)
-    dispatcher.enqueue(document_id)
+    job = await dispatcher.enqueue(document_id)
     return {
         "id": document_id,
         "filename": document.filename,
         "status": document.status,
+        "job_id": job.id,
     }
 
 
@@ -99,6 +102,43 @@ async def list_documents(
 ) -> List[Document]:
     result = await session.execute(select(Document))
     return list(result.scalars().all())
+
+
+@router.post("/{document_id}/process", status_code=202)
+async def enqueue_document_processing(
+    document_id: str,
+    session: AsyncSession = Depends(get_session),
+    dispatcher: DocumentJobDispatcher = Depends(get_document_job_dispatcher),
+) -> ProcessingJobResponse:
+    document_result = await session.execute(
+        select(Document.id).where(Document.id == document_id)
+    )
+    if document_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="document_not_found")
+
+    job = await dispatcher.enqueue(document_id)
+    return ProcessingJobResponse.model_validate(job)
+
+
+@router.get("/{document_id}/jobs")
+async def list_document_processing_jobs(
+    document_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> list[ProcessingJobResponse]:
+    document_result = await session.execute(
+        select(Document.id).where(Document.id == document_id)
+    )
+    if document_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="document_not_found")
+
+    result = await session.execute(
+        select(DocumentProcessingJob)
+        .where(DocumentProcessingJob.document_id == document_id)
+        .order_by(col(DocumentProcessingJob.queued_at).desc())
+    )
+    return [
+        ProcessingJobResponse.model_validate(job) for job in result.scalars().all()
+    ]
 
 
 @router.get("/{document_id}/pages")

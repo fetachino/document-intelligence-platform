@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Text,
+    text,
 )
 from sqlmodel import Field, SQLModel
 
@@ -23,6 +24,13 @@ class ProcessingStatus(str, Enum):
     uploaded = "uploaded"
     processing = "processing"
     processed = "processed"
+    failed = "failed"
+
+
+class ProcessingJobStatus(str, Enum):
+    queued = "queued"
+    running = "running"
+    succeeded = "succeeded"
     failed = "failed"
 
 
@@ -80,6 +88,57 @@ class Document(SQLModel, table=True):
     )
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class DocumentProcessingJob(SQLModel, table=True):
+    """Durable lifecycle record for one document processing request."""
+
+    __tablename__ = "document_processing_job"
+    __table_args__ = (
+        CheckConstraint("attempt_count >= 0", name="ck_processing_job_attempt_count"),
+        CheckConstraint("max_attempts > 0", name="ck_processing_job_max_attempts"),
+        Index(
+            "uq_processing_job_active_document",
+            "document_id",
+            unique=True,
+            postgresql_where=text("status IN ('queued', 'running')"),
+            sqlite_where=text("status IN ('queued', 'running')"),
+        ),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    document_id: str = Field(
+        foreign_key="document.id", ondelete="CASCADE", index=True
+    )
+    status: ProcessingJobStatus = Field(
+        default=ProcessingJobStatus.queued,
+        sa_column=Column(
+            SQLAlchemyEnum(
+                ProcessingJobStatus, native_enum=False, create_constraint=False
+            ),
+            nullable=False,
+        ),
+    )
+    attempt_count: int = 0
+    max_attempts: int = 2
+    last_error_code: Optional[str] = None
+    queued_at: datetime = Field(default_factory=utc_now)
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class ProcessingJobResponse(SQLModel):
+    id: str
+    document_id: str
+    status: ProcessingJobStatus
+    attempt_count: int
+    max_attempts: int
+    last_error_code: Optional[str]
+    queued_at: datetime
+    started_at: Optional[datetime]
+    finished_at: Optional[datetime]
+    updated_at: datetime
 
 
 class DocumentPage(SQLModel, table=True):

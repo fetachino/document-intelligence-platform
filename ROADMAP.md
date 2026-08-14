@@ -24,9 +24,11 @@ Milestone 2 - Complete and verified
 - Grounded Q&A API with citation linking (implemented)
 - Deterministic local evaluation dataset and computed metrics (implemented)
 
-Milestone 3 (planned)
+Milestone 3 (in progress)
 - Review, search, and grounded Q&A frontend workflows
-- Scalable worker architecture (Celery/RQ/Kubernetes)
+- Observable worker/job architecture with replaceable dispatcher (local slice implemented)
+- Distributed worker transport and scaling (Celery/RQ or equivalent, planned)
+- Kubernetes deployment architecture (planned)
 - S3-compatible storage adapter and signed URL support
 - RBAC and multi-tenant features
 - Deployment manifests for Kubernetes and cloud providers

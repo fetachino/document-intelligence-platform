@@ -1,4 +1,5 @@
 import logging
+from enum import Enum
 from pathlib import Path
 
 from sqlalchemy import delete
@@ -39,6 +40,12 @@ from .structured_extraction import (
 logger = logging.getLogger(__name__)
 
 
+class ProcessingOutcome(str, Enum):
+    succeeded = "succeeded"
+    failed = "failed"
+    document_not_found = "document_not_found"
+
+
 async def process_document(
     document_id: str,
     extractor: PageTextExtractor | None = None,
@@ -46,11 +53,11 @@ async def process_document(
     structured_extractor: StructuredExtractor | None = None,
     embedding_provider: EmbeddingProvider | None = None,
     chunker: TextChunker | None = None,
-) -> None:
+) -> ProcessingOutcome:
     """Extract page text, classify, extract fields, and index chunks."""
     storage_path = await _mark_processing(document_id)
     if storage_path is None:
-        return
+        return ProcessingOutcome.document_not_found
 
     active_extractor = extractor or LocalPageTextExtractor()
     try:
@@ -76,9 +83,11 @@ async def process_document(
             embedding_provider,
             chunker,
         )
+        return ProcessingOutcome.succeeded
     except Exception:
         logger.exception("Document processing failed for id=%s", document_id)
         await _mark_failed(document_id)
+        return ProcessingOutcome.failed
 
 
 async def _mark_processing(document_id: str) -> str | None:

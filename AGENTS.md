@@ -1,7 +1,9 @@
 Agents
 ======
 
-This repository uses background workers for document processing. For Milestone 1 a local worker is included; in later milestones this can be replaced with Celery, RQ, or a cloud task runner.
+This repository uses background workers for document processing. The current local worker
+persists observable jobs and runs them through FastAPI background tasks. Its dispatcher
+and worker protocols can later be implemented by Celery, RQ, or a cloud task runner.
 
 Local worker responsibilities:
 - Process newly uploaded documents
@@ -14,6 +16,7 @@ Agent guidelines
 - Agents should be idempotent and re-entrant.
 - All network calls must have timeouts and retries.
 - Agents must update document processing status in the database.
+- Workers must claim queued jobs before processing and use bounded retries.
 - Sensitive document text must never be logged.
 
 Notes for Milestone 1
@@ -33,3 +36,10 @@ Completed Milestone 2 implementation
   provider and atomically replaces stale chunks.
 - Grounded Q&A uses retrieved chunks only and binds citations from stored provenance.
 - External providers, distributed workers, and Milestone 3 infrastructure remain deferred.
+
+Current Milestone 3 worker slice
+- Each processing request creates a durable job with queued, running, succeeded, or failed state.
+- Only one queued or running job may exist for a document; terminal jobs remain as history.
+- The local worker atomically claims jobs and makes at most two processing attempts.
+- Persisted errors use stable codes rather than exception text or document content.
+- Distributed queue transports and independently scaled worker processes remain planned.
