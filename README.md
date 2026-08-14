@@ -17,6 +17,12 @@ Background processing
 - The current local worker uses FastAPI background tasks with bounded immediate retries;
   a distributed queue and separately scaled workers are not implemented yet.
 
+Frontend document workspace
+- The React workspace lists documents and displays durable processing job history.
+- Active queued or running jobs are polled until they reach a terminal state.
+- Reprocessing is guarded while active work exists and exposes stable backend error codes.
+- Classification review, structured-field correction, search, and Q&A UI remain planned.
+
 Grounded Q&A API
 - `POST /api/v1/qa` accepts a question, optional document IDs, and a retrieval limit.
 - Answers include stored chunk citations and ranked retrieval metadata.

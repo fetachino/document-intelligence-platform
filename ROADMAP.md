@@ -25,7 +25,8 @@ Milestone 2 - Complete and verified
 - Deterministic local evaluation dataset and computed metrics (implemented)
 
 Milestone 3 (in progress)
-- Review, search, and grounded Q&A frontend workflows
+- Document library, processing lifecycle, and reprocessing frontend foundation (implemented)
+- Classification review, structured-field correction, search, and grounded Q&A frontend workflows
 - Observable worker/job architecture with replaceable dispatcher (local slice implemented)
 - Distributed worker transport and scaling (Celery/RQ or equivalent, planned)
 - Kubernetes deployment architecture (planned)

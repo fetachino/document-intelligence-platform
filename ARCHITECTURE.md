@@ -7,8 +7,8 @@ Goals
 - Allow later replacement of local worker with distributed workers
 
 High level components
-- Frontend (React + TypeScript): upload UI and document library; review, search, and
-  citation-grounded Q&A interfaces are planned
+- Frontend (React + TypeScript): typed API client, upload and document workspace, processing
+  lifecycle polling; review, search, and citation-grounded Q&A interfaces are planned
 - Backend (FastAPI): API, DB models, document ingestion, processing orchestration, secure storage
 - Storage: local file storage adapter for dev; S3-compatible adapter planned for production
 - Database: PostgreSQL with pgvector for stored embeddings and cosine retrieval
@@ -102,3 +102,10 @@ Current background worker slice
   reprocessing after a terminal job creates a new history record.
 - FastAPI `BackgroundTasks` remains the local development transport. Celery, RQ, separate
   worker services, scheduling, and distributed recovery semantics are not implemented.
+
+Current frontend workspace slice
+- A centralized typed client owns document, job-history, upload, and reprocessing requests.
+- The document workspace polls only while the selected document has queued or running work,
+  prevents overlapping polls, and cleans up timers when work completes or selection changes.
+- The Vite development server proxies same-origin `/api` requests to FastAPI; Docker Compose
+  supplies the backend service target without exposing backend addresses to UI components.
