@@ -11,6 +11,7 @@ interface ClassificationReviewProps {
   correcting: boolean
   feedback: WorkspaceFeedback | null
   onCorrect: (documentType: DocumentType) => void
+  canReview: boolean
 }
 
 export function ClassificationReview({
@@ -20,6 +21,7 @@ export function ClassificationReview({
   correcting,
   feedback,
   onCorrect,
+  canReview,
 }: ClassificationReviewProps) {
   const [selectedType, setSelectedType] = useState<DocumentType>('unknown')
 
@@ -67,7 +69,7 @@ export function ClassificationReview({
               <select
                 id="classification-type"
                 value={selectedType}
-                disabled={correcting}
+                disabled={!canReview || correcting}
                 onChange={(event) => setSelectedType(event.target.value as DocumentType)}
               >
                 {DOCUMENT_TYPES.map((documentType) => (
@@ -77,7 +79,7 @@ export function ClassificationReview({
               <button
                 className="button button-secondary"
                 type="button"
-                disabled={correcting || selectedType === classification.effective_type}
+                disabled={!canReview || correcting || selectedType === classification.effective_type}
                 onClick={() => onCorrect(selectedType)}
               >
                 {correcting ? 'Saving...' : 'Save correction'}

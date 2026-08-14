@@ -11,6 +11,8 @@ High level components
   lifecycle polling, classification review, structured-field review, semantic search, and
   citation-grounded Q&A
 - Backend (FastAPI): API, DB models, document ingestion, processing orchestration, secure storage
+- Identity: local Argon2 password verification and bounded signed access tokens behind
+  replaceable adapters; centralized admin, reviewer, and viewer route policies
 - Storage: replaceable local-default or S3-compatible private object storage provider
 - Database: PostgreSQL with pgvector for stored embeddings and cosine retrieval
 - Worker: durable processing jobs executed through the local FastAPI background-task transport
@@ -36,6 +38,17 @@ Database strategy
 - Development and unit tests use SQLite + aiosqlite for fast, isolated runs.
 - PostgreSQL integration and the containerized runtime use pgvector with asyncpg.
 - Schema changes are managed with Alembic migrations located in alembic/; do not rely on SQLModel.metadata.create_all() in production.
+- Documents carry explicit tenant ownership. Derived rows inherit isolation through document
+  foreign keys, and retrieval joins tenant-owned documents before applying result limits.
+
+Current authentication and tenant slice
+- Users belong to one tenant and authenticate with workspace slug, email, and password.
+- Passwords are stored as Argon2 hashes. Short-lived HS256 tokens carry only user identity;
+  active status, tenant, and current role are reloaded from the database for each request.
+- Viewer access is read-only, reviewers may correct classifications and structured fields,
+  and admins may also upload and reprocess documents.
+- API document lookups, search scopes, and Q&A scopes enforce tenant ownership and use 404
+  responses for foreign identifiers. Workers remain trusted internal consumers of durable IDs.
 
 Storage
 - `StorageProvider` owns save, read, and delete operations using application-generated object
@@ -74,7 +87,7 @@ Current structured extraction slice
 Current structured field review slice
 - Corrections are append-only records keyed to a document, field name, and value index.
 - Each review records the automatic value seen, previous effective value, corrected
-  value, local reviewer identifier, and timestamp without changing extraction provenance.
+  value, authenticated reviewer identifier, and timestamp without changing extraction provenance.
 - Extraction responses expose automatic and effective values separately.
 - Reprocessing preserves corrections for fields that still exist. Review history marks
   older corrections as superseded and missing current fields as orphaned.

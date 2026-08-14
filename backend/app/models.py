@@ -69,6 +69,43 @@ class QaAnswerStatus(str, Enum):
     insufficient_evidence = "insufficient_evidence"
 
 
+LEGACY_TENANT_ID = "00000000-0000-0000-0000-000000000001"
+
+
+class UserRole(str, Enum):
+    admin = "admin"
+    reviewer = "reviewer"
+    viewer = "viewer"
+
+
+class Tenant(SQLModel, table=True):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    name: str
+    slug: str = Field(unique=True, index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class User(SQLModel, table=True):
+    __tablename__ = "app_user"
+    __table_args__ = (
+        Index("uq_app_user_tenant_email", "tenant_id", "email", unique=True),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenant.id", index=True)
+    email: str = Field(index=True)
+    password_hash: str
+    role: UserRole = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(UserRole, native_enum=False, create_constraint=False),
+            nullable=False,
+        )
+    )
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class Document(SQLModel, table=True):
     id: Optional[str] = Field(
         default_factory=lambda: str(uuid.uuid4()), primary_key=True
@@ -77,6 +114,9 @@ class Document(SQLModel, table=True):
     content_type: str
     size: int
     storage_path: str
+    tenant_id: str = Field(
+        default=LEGACY_TENANT_ID, foreign_key="tenant.id", index=True
+    )
     status: ProcessingStatus = Field(
         default=ProcessingStatus.uploaded,
         sa_column=Column(
@@ -105,7 +145,6 @@ class DocumentProcessingJob(SQLModel, table=True):
             sqlite_where=text("status IN ('queued', 'running')"),
         ),
     )
-
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     document_id: str = Field(
         foreign_key="document.id", ondelete="CASCADE", index=True
@@ -329,7 +368,6 @@ class DocumentChunk(SQLModel, table=True):
 
 class StructuredFieldCorrectionRequest(SQLModel):
     value: str = Field(min_length=1, max_length=2000)
-    reviewer_id: str = Field(min_length=1, max_length=100)
 
 
 class StructuredFieldResponse(SQLModel):

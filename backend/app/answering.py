@@ -143,6 +143,7 @@ class LocalExtractiveAnswerGenerator:
 async def answer_question(
     session: AsyncSession,
     question: str,
+    tenant_id: str,
     document_ids: Sequence[str] | None = None,
     retrieval_limit: int = 5,
     generator: AnswerGenerator | None = None,
@@ -156,6 +157,7 @@ async def answer_question(
         session,
         question,
         retrieval_limit,
+        tenant_id,
         active_embedding_provider,
         document_ids,
     )

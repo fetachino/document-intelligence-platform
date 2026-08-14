@@ -4,7 +4,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import App from './App'
 import {
   ApiError,
+  authApi,
   documentApi,
+  setAccessToken,
   type DocumentClassification,
   type DocumentRecord,
   type ProcessingJob,
@@ -15,6 +17,10 @@ vi.mock('./api/client', async () => {
   const actual = await vi.importActual<typeof import('./api/client')>('./api/client')
   return {
     ...actual,
+    authApi: {
+      login: vi.fn(),
+      getCurrentUser: vi.fn(),
+    },
     documentApi: {
       listDocuments: vi.fn(),
       listJobs: vi.fn(),
@@ -86,6 +92,15 @@ function job(status: ProcessingJobStatus, id = `job-${status}`): ProcessingJob {
 }
 
 beforeEach(() => {
+  setAccessToken('test-token')
+  vi.mocked(authApi.getCurrentUser).mockResolvedValue({
+    id: 'user-1',
+    email: 'admin@example.test',
+    role: 'admin',
+    tenant_id: 'tenant-1',
+    tenant_name: 'Test workspace',
+    tenant_slug: 'test',
+  })
   vi.mocked(documentApi.listDocuments).mockResolvedValue([documentOne, documentTwo])
   vi.mocked(documentApi.listJobs).mockResolvedValue([])
   vi.mocked(documentApi.getClassification).mockResolvedValue(automaticClassification)
@@ -101,6 +116,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  setAccessToken(null)
   vi.clearAllMocks()
   vi.useRealTimers()
 })
@@ -116,7 +132,7 @@ describe('document workspace', () => {
 
     render(<App />)
 
-    expect(screen.getByText('Loading documents...')).toBeInTheDocument()
+    expect(await screen.findByText('Loading documents...')).toBeInTheDocument()
     await act(async () => resolveDocuments([]))
   })
 
@@ -326,6 +342,56 @@ describe('document workspace', () => {
         effective_type: 'resume',
       })
     })
+  })
+})
+
+describe('authentication and role controls', () => {
+  test('signs in and sends the user to the tenant workspace', async () => {
+    setAccessToken(null)
+    vi.mocked(authApi.login).mockResolvedValue({
+      access_token: 'new-token',
+      token_type: 'bearer',
+      expires_in: 1800,
+    })
+    vi.mocked(authApi.getCurrentUser).mockResolvedValue({
+      id: 'reviewer-1',
+      email: 'reviewer@example.test',
+      role: 'reviewer',
+      tenant_id: 'tenant-1',
+      tenant_name: 'Review workspace',
+      tenant_slug: 'review',
+    })
+
+    render(<App />)
+    fireEvent.change(screen.getByLabelText('Workspace'), { target: { value: 'review' } })
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'reviewer@example.test' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret-password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(await screen.findByText('reviewer@example.test')).toBeInTheDocument()
+    expect(authApi.login).toHaveBeenCalledWith({
+      tenantSlug: 'review',
+      email: 'reviewer@example.test',
+      password: 'secret-password',
+    })
+  })
+
+  test('disables administrative and review controls for viewers', async () => {
+    vi.mocked(authApi.getCurrentUser).mockResolvedValue({
+      id: 'viewer-1',
+      email: 'viewer@example.test',
+      role: 'viewer',
+      tenant_id: 'tenant-1',
+      tenant_name: 'View workspace',
+      tenant_slug: 'view',
+    })
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /invoice-august\.pdf/i }))
+
+    expect(screen.getByRole('button', { name: 'Upload' })).toBeDisabled()
+    expect(await screen.findByRole('button', { name: 'Reprocess' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save correction' })).toBeDisabled()
   })
 })
 

@@ -1,10 +1,13 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
 from ..answering import answer_question
+from ..auth import require_roles
 from ..database import get_session
-from ..models import Document, QaRequest, QaResponse
+from ..models import Document, QaRequest, QaResponse, User, UserRole
 
 router = APIRouter()
 
@@ -12,6 +15,9 @@ router = APIRouter()
 @router.post("/qa")
 async def ask_document_question(
     request: QaRequest,
+    user: Annotated[
+        User, Depends(require_roles(UserRole.admin, UserRole.reviewer, UserRole.viewer))
+    ],
     session: AsyncSession = Depends(get_session),
 ) -> QaResponse:
     question = request.question.strip()
@@ -21,7 +27,10 @@ async def ask_document_question(
     document_ids = _normalized_document_ids(request.document_ids)
     if document_ids is not None:
         result = await session.execute(
-            select(Document.id).where(col(Document.id).in_(document_ids))
+            select(Document.id).where(
+                col(Document.id).in_(document_ids),
+                col(Document.tenant_id) == user.tenant_id,
+            )
         )
         existing_ids = set(result.scalars().all())
         if existing_ids != set(document_ids):
@@ -30,6 +39,7 @@ async def ask_document_question(
     return await answer_question(
         session,
         question,
+        tenant_id=user.tenant_id,
         document_ids=document_ids,
         retrieval_limit=request.retrieval_limit,
     )

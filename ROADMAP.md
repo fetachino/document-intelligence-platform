@@ -34,6 +34,6 @@ Milestone 3 (in progress)
 - Redis/RQ transport and standalone worker process (implemented); scaling validation remains planned
 - Kubernetes deployment architecture (planned)
 - S3-compatible private storage adapter (implemented); signed URL support remains planned if needed
-- RBAC and multi-tenant features
+- Local authentication, tenant isolation, and admin/reviewer/viewer RBAC (implemented)
 - Deployment manifests for Kubernetes and cloud providers
 - End-to-end performance and security tests

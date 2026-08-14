@@ -1,11 +1,36 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { ApiError, documentApi } from './client'
+import { ApiError, authApi, documentApi, setAccessToken } from './client'
 
 afterEach(() => {
+  setAccessToken(null)
   vi.unstubAllGlobals()
 })
 
 describe('documentApi', () => {
+  test('authenticates locally and attaches the access token centrally', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: 'signed-token', token_type: 'bearer', expires_in: 1800,
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        id: 'user-1', email: 'viewer@example.test', role: 'viewer',
+        tenant_id: 'tenant-1', tenant_name: 'Workspace', tenant_slug: 'workspace',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const token = await authApi.login({
+      tenantSlug: 'workspace', email: 'viewer@example.test', password: 'password',
+    })
+    setAccessToken(token.access_token)
+    await authApi.getCurrentUser()
+
+    const authenticatedHeaders = fetchMock.mock.calls[1][1]?.headers as Headers
+    expect(authenticatedHeaders.get('Authorization')).toBe('Bearer signed-token')
+    expect(fetchMock.mock.calls[0][1]?.body).toBe(JSON.stringify({
+      tenant_slug: 'workspace', email: 'viewer@example.test', password: 'password',
+    }))
+  })
+
   test('centralizes document requests', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } }),
@@ -90,14 +115,14 @@ describe('documentApi', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(
-      documentApi.correctStructuredField('doc/one', 'total amount', 0, '$12.00', 'reviewer-a'),
+      documentApi.correctStructuredField('doc/one', 'total amount', 0, '$12.00'),
     ).resolves.toEqual(field)
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/documents/doc%2Fone/extraction/fields/total%20amount/0',
       {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: '$12.00', reviewer_id: 'reviewer-a' }),
+        body: JSON.stringify({ value: '$12.00' }),
       },
     )
   })

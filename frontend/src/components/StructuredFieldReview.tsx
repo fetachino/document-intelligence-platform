@@ -10,6 +10,7 @@ import {
 
 interface StructuredFieldReviewProps {
   documentId: string
+  canReview: boolean
 }
 
 interface ReviewState {
@@ -26,7 +27,7 @@ interface ReviewFeedback {
   kind: 'success' | 'error'
 }
 
-export function StructuredFieldReview({ documentId }: StructuredFieldReviewProps) {
+export function StructuredFieldReview({ documentId, canReview }: StructuredFieldReviewProps) {
   const [state, setState] = useState<ReviewState>({
     documentId,
     extraction: null,
@@ -35,7 +36,6 @@ export function StructuredFieldReview({ documentId }: StructuredFieldReviewProps
     missing: false,
     error: null,
   })
-  const [reviewerId, setReviewerId] = useState('local-reviewer')
   const [correctingKey, setCorrectingKey] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<ReviewFeedback | null>(null)
   const requestVersion = useRef(0)
@@ -86,10 +86,9 @@ export function StructuredFieldReview({ documentId }: StructuredFieldReviewProps
 
   async function correctField(field: StructuredField, value: string) {
     const key = fieldKey(field)
-    const trimmedReviewerId = reviewerId.trim()
     if (
       correctingKey ||
-      !trimmedReviewerId ||
+      !canReview ||
       value.trim() === field.effective_value
     ) return
 
@@ -102,7 +101,6 @@ export function StructuredFieldReview({ documentId }: StructuredFieldReviewProps
         field.field_name,
         field.value_index,
         value,
-        trimmedReviewerId,
       )
       if (requestVersion.current !== version) return
       setState((current) => ({
@@ -177,17 +175,6 @@ export function StructuredFieldReview({ documentId }: StructuredFieldReviewProps
             <span>Extractor <strong>{currentState.extraction.extractor_version}</strong></span>
           </div>
 
-          <label className="reviewer-field" htmlFor="structured-reviewer-id">
-            <span>Reviewer ID</span>
-            <input
-              id="structured-reviewer-id"
-              value={reviewerId}
-              maxLength={100}
-              disabled={correctingKey !== null}
-              onChange={(event) => setReviewerId(event.target.value)}
-            />
-          </label>
-
           {groupedFields.length === 0 && (
             <p className="state-message">No structured fields were extracted.</p>
           )}
@@ -201,7 +188,7 @@ export function StructuredFieldReview({ documentId }: StructuredFieldReviewProps
                       key={fieldKey(field)}
                       field={field}
                       valueCount={fields.length}
-                      reviewerAvailable={Boolean(reviewerId.trim())}
+                      reviewerAvailable={canReview}
                       correcting={correctingKey === fieldKey(field)}
                       correctionLocked={correctingKey !== null}
                       onCorrect={(value) => void correctField(field, value)}

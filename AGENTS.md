@@ -3,7 +3,7 @@ Agents
 
 This repository uses background workers for document processing. The current local worker
 persists observable jobs and runs them through FastAPI background tasks. Its dispatcher
-and worker protocols can later be implemented by Celery, RQ, or a cloud task runner.
+and worker protocols support local delivery or Redis/RQ delivery to a standalone process.
 
 Local worker responsibilities:
 - Process newly uploaded documents
@@ -37,7 +37,7 @@ Completed Milestone 2 implementation
 - Successful processing indexes non-empty page text with the replaceable local embedding
   provider and atomically replaces stale chunks.
 - Grounded Q&A uses retrieved chunks only and binds citations from stored provenance.
-- External providers, distributed workers, and Milestone 3 infrastructure remain deferred.
+- External AI providers and later deployment infrastructure remain deferred.
 
 Current Milestone 3 worker slice
 - Each processing request creates a durable job with queued, running, succeeded, or failed state.
@@ -46,3 +46,5 @@ Current Milestone 3 worker slice
 - Persisted errors use stable codes rather than exception text or document content.
 - RQ can deliver stable job IDs through Redis to a standalone worker process; PostgreSQL
   claiming and bounded attempts remain authoritative.
+- Workers are trusted internal processes and do not accept end-user tokens. Tenant ownership
+  remains attached to the document loaded from each durable job ID.

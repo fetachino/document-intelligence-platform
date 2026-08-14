@@ -4,6 +4,28 @@ export type DocumentType = 'invoice' | 'resume' | 'contract' | 'other' | 'unknow
 export type ClassificationSource = 'classifier' | 'human'
 export type StructuredExtractionStatus = 'processing' | 'completed' | 'failed'
 export type StructuredFieldReviewStatus = 'active' | 'superseded' | 'orphaned'
+export type UserRole = 'admin' | 'reviewer' | 'viewer'
+
+export interface CurrentUser {
+  id: string
+  email: string
+  role: UserRole
+  tenant_id: string
+  tenant_name: string
+  tenant_slug: string
+}
+
+export interface LoginRequest {
+  tenantSlug: string
+  email: string
+  password: string
+}
+
+export interface TokenResponse {
+  access_token: string
+  token_type: 'bearer'
+  expires_in: number
+}
 
 export interface DocumentRecord {
   id: string
@@ -152,10 +174,26 @@ export class ApiError extends Error {
   }
 }
 
+const TOKEN_STORAGE_KEY = 'document-intelligence-access-token'
+let accessToken = window.localStorage.getItem(TOKEN_STORAGE_KEY)
+
+export function setAccessToken(token: string | null): void {
+  accessToken = token
+  if (token) window.localStorage.setItem(TOKEN_STORAGE_KEY, token)
+  else window.localStorage.removeItem(TOKEN_STORAGE_KEY)
+}
+
+export function hasAccessToken(): boolean {
+  return Boolean(accessToken)
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
   try {
-    response = await fetch(path, init)
+    const authenticatedInit = accessToken
+      ? { ...init, headers: withAuthorization(init?.headers, accessToken) }
+      : init
+    response = await fetch(path, authenticatedInit)
   } catch {
     throw new ApiError('Unable to reach the document service.', 0)
   }
@@ -172,6 +210,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return (await response.json()) as T
+}
+
+function withAuthorization(headers: HeadersInit | undefined, token: string): Headers {
+  const authenticated = new Headers(headers)
+  authenticated.set('Authorization', `Bearer ${token}`)
+  return authenticated
+}
+
+export const authApi = {
+  login: ({ tenantSlug, email, password }: LoginRequest) =>
+    request<TokenResponse>('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenant_slug: tenantSlug, email, password }),
+    }),
+  getCurrentUser: () => request<CurrentUser>('/api/v1/auth/me'),
 }
 
 export const documentApi = {
@@ -204,14 +258,13 @@ export const documentApi = {
     fieldName: string,
     valueIndex: number,
     value: string,
-    reviewerId: string,
   ) =>
     request<StructuredField>(
       `/api/v1/documents/${encodeURIComponent(documentId)}/extraction/fields/${encodeURIComponent(fieldName)}/${valueIndex}`,
       {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value, reviewer_id: reviewerId }),
+        body: JSON.stringify({ value }),
       },
     ),
   searchDocuments: ({ query, limit, documentId }: SemanticSearchRequest) => {

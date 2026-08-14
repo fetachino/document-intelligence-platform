@@ -35,6 +35,12 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+asyncpg://docuser:docpass@db:5432/docdb
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:-}
+      AUTH_TOKEN_TTL_MINUTES: ${AUTH_TOKEN_TTL_MINUTES:-30}
+      BOOTSTRAP_TENANT_NAME: ${BOOTSTRAP_TENANT_NAME:-Local workspace}
+      BOOTSTRAP_TENANT_SLUG: ${BOOTSTRAP_TENANT_SLUG:-local}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
       JOB_TRANSPORT: ${JOB_TRANSPORT:-local}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       RQ_QUEUE_NAME: ${RQ_QUEUE_NAME:-document-processing}

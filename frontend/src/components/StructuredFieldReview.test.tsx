@@ -86,7 +86,7 @@ afterEach(() => {
 
 describe('StructuredFieldReview', () => {
   test('renders automatic values and extraction provenance', async () => {
-    render(<StructuredFieldReview documentId="doc-1" />)
+    render(<StructuredFieldReview documentId="doc-1" canReview />)
 
     expect(await screen.findByRole('heading', { name: 'Total Amount' })).toBeInTheDocument()
     expect(screen.getByText('Automatic').parentElement).toHaveTextContent('$10.00')
@@ -100,7 +100,7 @@ describe('StructuredFieldReview', () => {
       ...automaticExtraction,
       fields: [reviewedField],
     })
-    render(<StructuredFieldReview documentId="doc-1" />)
+    render(<StructuredFieldReview documentId="doc-1" canReview />)
 
     expect(await screen.findByText('Human override')).toBeInTheDocument()
     expect(screen.getByText('Automatic').parentElement).toHaveTextContent('$10.00')
@@ -122,7 +122,7 @@ describe('StructuredFieldReview', () => {
         },
       ],
     })
-    render(<StructuredFieldReview documentId="doc-1" />)
+    render(<StructuredFieldReview documentId="doc-1" canReview />)
 
     expect(await screen.findByRole('heading', { name: 'Party' })).toBeInTheDocument()
     expect(screen.getByText('Value 1')).toBeInTheDocument()
@@ -138,7 +138,7 @@ describe('StructuredFieldReview', () => {
     vi.mocked(documentApi.getExtractionReviews)
       .mockResolvedValueOnce(emptyHistory)
       .mockResolvedValueOnce({ document_id: 'doc-1', corrections: [activeCorrection] })
-    render(<StructuredFieldReview documentId="doc-1" />)
+    render(<StructuredFieldReview documentId="doc-1" canReview />)
     const input = await screen.findByLabelText('Correct value')
 
     fireEvent.change(input, { target: { value: '$12.00' } })
@@ -150,7 +150,6 @@ describe('StructuredFieldReview', () => {
       'total_amount',
       0,
       '$12.00',
-      'local-reviewer',
     )
     expect(documentApi.getExtraction).toHaveBeenCalledTimes(2)
     expect(documentApi.getExtractionReviews).toHaveBeenCalledTimes(2)
@@ -159,7 +158,7 @@ describe('StructuredFieldReview', () => {
   })
 
   test('guards duplicate and no-op corrections', async () => {
-    render(<StructuredFieldReview documentId="doc-1" />)
+    render(<StructuredFieldReview documentId="doc-1" canReview />)
 
     expect(await screen.findByRole('button', { name: 'Save field' })).toBeDisabled()
     expect(documentApi.correctStructuredField).not.toHaveBeenCalled()
@@ -169,7 +168,7 @@ describe('StructuredFieldReview', () => {
     vi.mocked(documentApi.correctStructuredField).mockRejectedValue(
       new ApiError('invalid_field_value', 422, 'invalid_field_value'),
     )
-    render(<StructuredFieldReview documentId="doc-1" />)
+    render(<StructuredFieldReview documentId="doc-1" canReview />)
     const input = await screen.findByLabelText('Correct value')
 
     fireEvent.change(input, { target: { value: 'approximately ten' } })
@@ -196,7 +195,7 @@ describe('StructuredFieldReview', () => {
       document_id: 'doc-1',
       corrections,
     })
-    render(<StructuredFieldReview documentId="doc-1" />)
+    render(<StructuredFieldReview documentId="doc-1" canReview />)
 
     expect(await screen.findByText('Superseded')).toBeInTheDocument()
     expect(screen.getByText('Active')).toBeInTheDocument()
@@ -209,7 +208,7 @@ describe('StructuredFieldReview', () => {
     vi.mocked(documentApi.getExtraction).mockRejectedValue(
       new ApiError('extraction_service_unavailable', 503),
     )
-    render(<StructuredFieldReview documentId="doc-1" />)
+    render(<StructuredFieldReview documentId="doc-1" canReview />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent('extraction_service_unavailable')
   })
@@ -218,7 +217,7 @@ describe('StructuredFieldReview', () => {
     vi.mocked(documentApi.getExtraction).mockRejectedValue(
       new ApiError('structured_extraction_not_found', 404, 'structured_extraction_not_found'),
     )
-    render(<StructuredFieldReview documentId="doc-1" />)
+    render(<StructuredFieldReview documentId="doc-1" canReview />)
 
     expect(await screen.findByText('Structured extraction is not available yet.')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
@@ -236,10 +235,10 @@ describe('StructuredFieldReview', () => {
     vi.mocked(documentApi.getExtractionReviews)
       .mockResolvedValueOnce(emptyHistory)
       .mockResolvedValueOnce({ document_id: 'doc-2', corrections: [] })
-    const { rerender } = render(<StructuredFieldReview documentId="doc-1" />)
+    const { rerender } = render(<StructuredFieldReview documentId="doc-1" canReview />)
     await screen.findByRole('heading', { name: 'Total Amount' })
 
-    rerender(<StructuredFieldReview documentId="doc-2" />)
+    rerender(<StructuredFieldReview documentId="doc-2" canReview />)
 
     expect(await screen.findByText('Loading structured fields...')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Total Amount' })).not.toBeInTheDocument()

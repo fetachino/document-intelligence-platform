@@ -38,6 +38,15 @@ Frontend document workspace
   all-document and selected-document retrieval with stored chunk provenance and cosine distance.
   Grounded Q&A supports the same scopes and displays backend citations, retrieval context, and
   explicit insufficient-evidence responses.
+- Local sign-in uses short-lived access tokens. Documents, retrieval, and review workflows are
+  tenant-scoped; admin, reviewer, and viewer roles control the available actions.
+
+Local authentication
+- Set `AUTH_TOKEN_SECRET` to a random value of at least 32 characters.
+- To create the first local workspace admin, set `BOOTSTRAP_ADMIN_EMAIL` and a
+  `BOOTSTRAP_ADMIN_PASSWORD` of at least 12 characters before startup. The bootstrap is
+  idempotent and disabled when both values are blank.
+- Login requires workspace slug, email, and password. No external identity provider is required.
 
 Grounded Q&A API
 - `POST /api/v1/qa` accepts a question, optional document IDs, and a retrieval limit.

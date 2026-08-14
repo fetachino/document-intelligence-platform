@@ -46,7 +46,17 @@ Network and Timeouts
 - Fail gracefully and surface clear errors to users without leaking sensitive data.
 
 Access Control
-- Authentication and authorization are not implemented and remain planned for a later milestone.
+- Local passwords are stored as Argon2 hashes; plaintext passwords and access tokens must never
+  be logged. Signing keys and optional bootstrap credentials are environment-only.
+- Access tokens have a bounded lifetime and identify a user; current tenant, active state, and
+  role are loaded from the database on each request. Login failures use one generic response.
+- Tenant ownership is enforced by backend queries for documents, derived resources, search, and
+  Q&A. Frontend role controls are usability hints, not a security boundary.
+- Browser token storage is trusted against script injection in this local implementation. A
+  hardened deployment should apply a strict content-security policy and may replace the local
+  token adapter with an external identity provider and protected cookie flow.
+- Background workers are trusted internal processes. They receive durable job IDs without user
+  tokens and preserve tenant ownership by processing the referenced document in place.
 
 Testing
 - Mock external providers in tests.

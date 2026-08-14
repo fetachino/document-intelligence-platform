@@ -21,6 +21,8 @@ interface DocumentWorkspaceProps {
   classificationError: string | null
   classificationCorrecting: boolean
   classificationFeedback: WorkspaceFeedback | null
+  canAdminister: boolean
+  canReview: boolean
   onReprocess: () => void
   onCorrectClassification: (documentType: DocumentType) => void
 }
@@ -42,6 +44,8 @@ export function DocumentWorkspace({
   classificationError,
   classificationCorrecting,
   classificationFeedback,
+  canAdminister,
+  canReview,
   onReprocess,
   onCorrectClassification,
 }: DocumentWorkspaceProps) {
@@ -66,7 +70,7 @@ export function DocumentWorkspace({
         <button
           className="button button-primary"
           type="button"
-          disabled={hasActiveJob || reprocessing}
+          disabled={!canAdminister || hasActiveJob || reprocessing}
           onClick={onReprocess}
         >
           {reprocessing ? 'Queueing...' : 'Reprocess'}
@@ -97,9 +101,10 @@ export function DocumentWorkspace({
         correcting={classificationCorrecting}
         feedback={classificationFeedback}
         onCorrect={onCorrectClassification}
+        canReview={canReview}
       />
 
-      <StructuredFieldReview documentId={document.id} />
+      <StructuredFieldReview documentId={document.id} canReview={canReview} />
 
       <section className="job-section">
         <div className="section-heading">

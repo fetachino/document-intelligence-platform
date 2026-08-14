@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ApiError,
+  authApi,
   documentApi,
+  hasAccessToken,
+  setAccessToken,
+  type CurrentUser,
   type DocumentClassification,
   type DocumentRecord,
   type DocumentType,
@@ -22,7 +26,36 @@ export interface AppProps {
   pollIntervalMs?: number
 }
 
-export default function App({ pollIntervalMs = DEFAULT_POLL_INTERVAL_MS }: AppProps) {
+export default function App(props: AppProps) {
+  const [user, setUser] = useState<CurrentUser | null>(null)
+  const [checkingSession, setCheckingSession] = useState(hasAccessToken())
+
+  useEffect(() => {
+    if (!hasAccessToken()) return
+    void authApi.getCurrentUser().then(
+      setUser,
+      () => setAccessToken(null),
+    ).finally(() => setCheckingSession(false))
+  }, [])
+
+  if (checkingSession) return <main className="auth-shell"><p>Checking session...</p></main>
+  if (!user) return <LoginForm onAuthenticated={setUser} />
+  return <WorkspaceApp {...props} user={user} onLogout={() => {
+    setAccessToken(null)
+    setUser(null)
+  }} />
+}
+
+interface WorkspaceAppProps extends AppProps {
+  user: CurrentUser
+  onLogout: () => void
+}
+
+function WorkspaceApp({
+  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+  user,
+  onLogout,
+}: WorkspaceAppProps) {
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
   const [documentsLoading, setDocumentsLoading] = useState(true)
   const [documentsError, setDocumentsError] = useState<string | null>(null)
@@ -48,6 +81,8 @@ export default function App({ pollIntervalMs = DEFAULT_POLL_INTERVAL_MS }: AppPr
     [documents, selectedDocumentId],
   )
   const hasActiveJob = jobs.some((job) => job.status === 'queued' || job.status === 'running')
+  const canAdminister = user.role === 'admin'
+  const canReview = canAdminister || user.role === 'reviewer'
 
   const loadDocuments = useCallback(async () => {
     setDocumentsLoading(true)
@@ -239,16 +274,21 @@ export default function App({ pollIntervalMs = DEFAULT_POLL_INTERVAL_MS }: AppPr
           <p className="eyebrow">Document intelligence</p>
           <h1>Processing workspace</h1>
         </div>
+        <div className="identity-control">
+          <div><strong>{user.email}</strong><span>{user.tenant_name} · {user.role}</span></div>
+          <button className="button button-secondary" type="button" onClick={onLogout}>Log out</button>
+        </div>
         <div className="upload-control">
           <label className="file-picker">
             <span>{file ? file.name : 'Choose document'}</span>
             <input
               aria-label="Choose document"
               type="file"
+              disabled={!canAdminister}
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
           </label>
-          <button className="button button-primary" type="button" disabled={!file || uploading} onClick={upload}>
+          <button className="button button-primary" type="button" disabled={!canAdminister || !file || uploading} onClick={upload}>
             {uploading ? 'Uploading...' : 'Upload'}
           </button>
         </div>
@@ -290,11 +330,54 @@ export default function App({ pollIntervalMs = DEFAULT_POLL_INTERVAL_MS }: AppPr
           classificationError={classificationError}
           classificationCorrecting={classificationCorrecting}
           classificationFeedback={classificationFeedback}
+          canAdminister={canAdminister}
+          canReview={canReview}
           onReprocess={() => void reprocess()}
           onCorrectClassification={(documentType) => void correctClassification(documentType)}
         />
       </div>
     </div>
+  )
+}
+
+function LoginForm({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) => void }) {
+  const [tenantSlug, setTenantSlug] = useState('local')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault()
+    if (submitting) return
+    setSubmitting(true)
+    setError(null)
+    try {
+      const token = await authApi.login({ tenantSlug, email, password })
+      setAccessToken(token.access_token)
+      onAuthenticated(await authApi.getCurrentUser())
+    } catch (requestError) {
+      setAccessToken(null)
+      setError(errorMessage(requestError, 'Could not sign in.'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <main className="auth-shell">
+      <form className="login-panel" onSubmit={(event) => void submit(event)}>
+        <p className="eyebrow">Document intelligence</p>
+        <h1>Sign in</h1>
+        <label>Workspace<input value={tenantSlug} required onChange={(event) => setTenantSlug(event.target.value)} /></label>
+        <label>Email<input type="email" value={email} required onChange={(event) => setEmail(event.target.value)} /></label>
+        <label>Password<input type="password" value={password} required onChange={(event) => setPassword(event.target.value)} /></label>
+        {error && <p className="feedback feedback-error" role="alert">{error}</p>}
+        <button className="button button-primary" disabled={submitting} type="submit">
+          {submitting ? 'Signing in...' : 'Sign in'}
+        </button>
+      </form>
+    </main>
   )
 }
 
