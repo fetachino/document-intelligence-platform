@@ -5,13 +5,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
 from .embeddings import EmbeddingProvider, LocalHashEmbeddingProvider
-from .models import DocumentChunk, SemanticSearchResult
+from .models import Document, DocumentChunk, SemanticSearchResult
 
 
 async def semantic_search(
     session: AsyncSession,
     query: str,
     limit: int,
+    tenant_id: str,
     provider: EmbeddingProvider | None = None,
     document_ids: Sequence[str] | None = None,
 ) -> list[SemanticSearchResult]:
@@ -26,7 +27,11 @@ async def semantic_search(
     distance = embedding_column.cosine_distance(vectors[0])
     statement = (
         select(DocumentChunk, distance.label("distance"))
-        .where(DocumentChunk.embedding_model == active_provider.model)
+        .join(Document, col(Document.id) == col(DocumentChunk.document_id))
+        .where(
+            DocumentChunk.embedding_model == active_provider.model,
+            col(Document.tenant_id) == tenant_id,
+        )
         .order_by(distance)
         .limit(limit)
     )

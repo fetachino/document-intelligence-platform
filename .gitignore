@@ -9,6 +9,7 @@ __pycache__/
 # Environment and local databases
 .env
 dev.db
+deploy/kubernetes/secret.yaml
 
 # Frontend generated files
 frontend/node_modules/

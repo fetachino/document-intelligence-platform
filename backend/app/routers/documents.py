@@ -1,8 +1,6 @@
-import io
 import logging
-import os
 from collections.abc import Sequence
-from typing import List
+from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.exc import SQLAlchemyError
@@ -10,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
 from ..database import get_session
+from ..auth import require_roles
 from ..jobs import DocumentJobDispatcher, get_document_job_dispatcher
 from ..models import (
     ClassificationReviewRequest,
@@ -18,30 +17,46 @@ from ..models import (
     DocumentClassification,
     DocumentClassificationReview,
     DocumentPage,
+    DocumentProcessingJob,
     DocumentStructuredExtraction,
     DocumentStructuredField,
     DocumentStructuredFieldCorrection,
     ProcessingStatus,
+    ProcessingJobResponse,
     StructuredExtractionResponse,
     StructuredFieldCorrectionRequest,
     StructuredFieldCorrectionResponse,
     StructuredFieldResponse,
     StructuredFieldReviewHistoryResponse,
     StructuredFieldReviewStatus,
+    User,
+    UserRole,
     utc_now,
 )
 from ..processing import reextract_document_fields
-from ..storage import is_allowed_extension, save_upload, validate_file_size
+from ..storage import (
+    StorageError,
+    StorageProvider,
+    build_document_object_key,
+    get_storage_provider,
+    is_allowed_extension,
+    validate_file_size,
+)
 from ..structured_review import LocalStructuredFieldReviewer, StructuredFieldReviewError
 
 router = APIRouter()
+read_access = require_roles(UserRole.admin, UserRole.reviewer, UserRole.viewer)
+review_access = require_roles(UserRole.admin, UserRole.reviewer)
+admin_access = require_roles(UserRole.admin)
 
 
 @router.post("/upload")
 async def upload_document(
+    user: Annotated[User, Depends(admin_access)],
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
     dispatcher: DocumentJobDispatcher = Depends(get_document_job_dispatcher),
+    storage: StorageProvider = Depends(get_storage_provider),
 ) -> dict:
     if not file.filename or not isinstance(file.filename, str) or not file.filename.strip():
         raise HTTPException(status_code=400, detail="missing_filename")
@@ -49,26 +64,30 @@ async def upload_document(
 
     if not is_allowed_extension(filename):
         raise HTTPException(status_code=400, detail="unsupported_file_type")
-    content_bytes = await file.read()
-    content = io.BytesIO(content_bytes)
+    content = await file.read()
     try:
         size = validate_file_size(content)
     except ValueError:
         raise HTTPException(status_code=400, detail="file_too_large")
 
-    try:
-        storage_path = await save_upload(content, filename)
-    except Exception:
-        logging.exception("Failed to save upload")
-        raise HTTPException(status_code=500, detail="storage_error")
-
     document = Document(
+        tenant_id=user.tenant_id,
         filename=filename,
         content_type=file.content_type or "application/octet-stream",
         size=size,
-        storage_path=storage_path,
+        storage_path="",
         status=ProcessingStatus.uploaded,
     )
+    if document.id is None:
+        raise HTTPException(status_code=500, detail="document_id_error")
+    storage_reference = build_document_object_key(document.id, filename)
+    try:
+        await storage.save(storage_reference, content)
+    except StorageError:
+        logging.error("Failed to save document object")
+        raise HTTPException(status_code=500, detail="storage_error")
+    document.storage_path = storage_reference
+
     try:
         session.add(document)
         await session.commit()
@@ -76,40 +95,72 @@ async def upload_document(
     except SQLAlchemyError:
         logging.exception("Database error when storing document metadata")
         try:
-            if os.path.exists(storage_path):
-                os.remove(storage_path)
-        except Exception:
-            pass
+            await storage.delete(storage_reference)
+        except StorageError:
+            logging.error("Failed to delete document object after database error")
         await session.rollback()
         raise HTTPException(status_code=500, detail="db_error")
 
     document_id = str(document.id)
     logging.info("Stored document id=%s", document_id)
-    dispatcher.enqueue(document_id)
+    job = await dispatcher.enqueue(document_id)
     return {
         "id": document_id,
         "filename": document.filename,
         "status": document.status,
+        "job_id": job.id,
     }
 
 
 @router.get("/")
 async def list_documents(
+    user: Annotated[User, Depends(read_access)],
     session: AsyncSession = Depends(get_session),
 ) -> List[Document]:
-    result = await session.execute(select(Document))
+    result = await session.execute(
+        select(Document).where(col(Document.tenant_id) == user.tenant_id)
+    )
     return list(result.scalars().all())
+
+
+@router.post("/{document_id}/process", status_code=202)
+async def enqueue_document_processing(
+    document_id: str,
+    user: Annotated[User, Depends(admin_access)],
+    session: AsyncSession = Depends(get_session),
+    dispatcher: DocumentJobDispatcher = Depends(get_document_job_dispatcher),
+) -> ProcessingJobResponse:
+    await _get_tenant_document(session, document_id, user.tenant_id)
+
+    job = await dispatcher.enqueue(document_id)
+    return ProcessingJobResponse.model_validate(job)
+
+
+@router.get("/{document_id}/jobs")
+async def list_document_processing_jobs(
+    document_id: str,
+    user: Annotated[User, Depends(read_access)],
+    session: AsyncSession = Depends(get_session),
+) -> list[ProcessingJobResponse]:
+    await _get_tenant_document(session, document_id, user.tenant_id)
+
+    result = await session.execute(
+        select(DocumentProcessingJob)
+        .where(DocumentProcessingJob.document_id == document_id)
+        .order_by(col(DocumentProcessingJob.queued_at).desc())
+    )
+    return [
+        ProcessingJobResponse.model_validate(job) for job in result.scalars().all()
+    ]
 
 
 @router.get("/{document_id}/pages")
 async def list_document_pages(
-    document_id: str, session: AsyncSession = Depends(get_session)
+    document_id: str,
+    user: Annotated[User, Depends(read_access)],
+    session: AsyncSession = Depends(get_session),
 ) -> List[DocumentPage]:
-    document_result = await session.execute(
-        select(Document).where(Document.id == document_id)
-    )
-    if document_result.scalar_one_or_none() is None:
-        raise HTTPException(status_code=404, detail="document_not_found")
+    await _get_tenant_document(session, document_id, user.tenant_id)
 
     page_result = await session.execute(
         select(DocumentPage)
@@ -121,8 +172,11 @@ async def list_document_pages(
 
 @router.get("/{document_id}/classification")
 async def get_document_classification(
-    document_id: str, session: AsyncSession = Depends(get_session)
+    document_id: str,
+    user: Annotated[User, Depends(read_access)],
+    session: AsyncSession = Depends(get_session),
 ) -> DocumentClassification:
+    await _get_tenant_document(session, document_id, user.tenant_id)
     return await _get_classification(session, document_id)
 
 
@@ -130,8 +184,10 @@ async def get_document_classification(
 async def review_document_classification(
     document_id: str,
     review: ClassificationReviewRequest,
+    user: Annotated[User, Depends(review_access)],
     session: AsyncSession = Depends(get_session),
 ) -> DocumentClassification:
+    await _get_tenant_document(session, document_id, user.tenant_id)
     classification = await _get_classification(session, document_id)
     if classification.effective_type == review.document_type:
         await reextract_document_fields(document_id)
@@ -172,9 +228,13 @@ async def _get_classification(
 
 @router.get("/{document_id}/extraction")
 async def get_document_structured_extraction(
-    document_id: str, session: AsyncSession = Depends(get_session)
+    document_id: str,
+    user: Annotated[User, Depends(read_access)],
+    session: AsyncSession = Depends(get_session),
 ) -> StructuredExtractionResponse:
-    state = await _get_structured_extraction_state(session, document_id)
+    state = await _get_structured_extraction_state(
+        session, document_id, user.tenant_id
+    )
 
     fields_result = await session.execute(
         select(DocumentStructuredField)
@@ -219,12 +279,12 @@ async def correct_document_structured_field(
     field_name: str,
     value_index: int,
     review: StructuredFieldCorrectionRequest,
+    user: Annotated[User, Depends(review_access)],
     session: AsyncSession = Depends(get_session),
 ) -> StructuredFieldResponse:
-    state = await _get_structured_extraction_state(session, document_id)
-    reviewer_id = review.reviewer_id.strip()
-    if not reviewer_id:
-        raise HTTPException(status_code=422, detail="invalid_reviewer_id")
+    state = await _get_structured_extraction_state(
+        session, document_id, user.tenant_id
+    )
 
     try:
         corrected_value = LocalStructuredFieldReviewer().validate(
@@ -269,7 +329,7 @@ async def correct_document_structured_field(
         automatic_value=field.value,
         previous_effective_value=previous_effective_value,
         corrected_value=corrected_value,
-        reviewer_id=reviewer_id,
+        reviewer_id=user.id,
         created_at=utc_now(),
     )
     session.add(correction)
@@ -280,9 +340,13 @@ async def correct_document_structured_field(
 
 @router.get("/{document_id}/extraction/reviews")
 async def get_document_structured_field_reviews(
-    document_id: str, session: AsyncSession = Depends(get_session)
+    document_id: str,
+    user: Annotated[User, Depends(read_access)],
+    session: AsyncSession = Depends(get_session),
 ) -> StructuredFieldReviewHistoryResponse:
-    state = await _get_structured_extraction_state(session, document_id)
+    state = await _get_structured_extraction_state(
+        session, document_id, user.tenant_id
+    )
     fields_result = await session.execute(
         select(DocumentStructuredField).where(
             DocumentStructuredField.document_id == document_id
@@ -335,13 +399,9 @@ async def get_document_structured_field_reviews(
 
 
 async def _get_structured_extraction_state(
-    session: AsyncSession, document_id: str
+    session: AsyncSession, document_id: str, tenant_id: str
 ) -> DocumentStructuredExtraction:
-    document_result = await session.execute(
-        select(Document).where(Document.id == document_id)
-    )
-    if document_result.scalar_one_or_none() is None:
-        raise HTTPException(status_code=404, detail="document_not_found")
+    await _get_tenant_document(session, document_id, tenant_id)
     state_result = await session.execute(
         select(DocumentStructuredExtraction).where(
             DocumentStructuredExtraction.document_id == document_id
@@ -351,6 +411,20 @@ async def _get_structured_extraction_state(
     if state is None:
         raise HTTPException(status_code=404, detail="structured_extraction_not_found")
     return state
+
+
+async def _get_tenant_document(
+    session: AsyncSession, document_id: str, tenant_id: str
+) -> Document:
+    result = await session.execute(
+        select(Document).where(
+            Document.id == document_id, col(Document.tenant_id) == tenant_id
+        )
+    )
+    document = result.scalar_one_or_none()
+    if document is None:
+        raise HTTPException(status_code=404, detail="document_not_found")
+    return document
 
 
 def _latest_corrections(

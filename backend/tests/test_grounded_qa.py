@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete
 from sqlmodel import col
 
@@ -14,7 +14,14 @@ from backend.app.answering import (
     answer_question,
 )
 from backend.app.database import get_engine, get_sessionmaker
-from backend.app.models import Document, ExtractionMethod, QaAnswerStatus, QaResponse
+from backend.app.models import (
+    LEGACY_TENANT_ID,
+    Document,
+    ExtractionMethod,
+    QaAnswerStatus,
+    QaResponse,
+    Tenant,
+)
 from backend.app.ocr import ExtractedPage
 from backend.app.processing import process_document
 from backend.app.qa_evaluation import (
@@ -147,7 +154,9 @@ def test_postgres_qa_api_grounding_scope_and_validation(tmp_path, monkeypatch):
         try:
             from backend.app.main import app
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as client:
                 payload = {
                     "question": "What is the Project Atlas deadline?",
                     "document_ids": [atlas_id],
@@ -225,6 +234,68 @@ def test_postgres_qa_api_grounding_scope_and_validation(tmp_path, monkeypatch):
     asyncio.run(scenario())
 
 
+def test_postgres_search_and_qa_exclude_foreign_tenant_content(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", _postgres_url())
+
+    async def scenario() -> None:
+        local_id = await _create_document(
+            tmp_path,
+            "tenant-local.pdf",
+            ["Tenant Alpha launch date is October 2, 2026."],
+        )
+        foreign_path = tmp_path / "tenant-foreign.pdf"
+        foreign_path.write_bytes(b"test document")
+        foreign_tenant = Tenant(name="Foreign tenant", slug=f"foreign-{local_id}")
+        async with get_sessionmaker()() as session:
+            session.add(foreign_tenant)
+            await session.flush()
+            foreign_document = Document(
+                tenant_id=foreign_tenant.id,
+                filename=foreign_path.name,
+                content_type="application/pdf",
+                size=foreign_path.stat().st_size,
+                storage_path=str(foreign_path),
+            )
+            session.add(foreign_document)
+            await session.commit()
+            assert foreign_document.id is not None
+            foreign_id = foreign_document.id
+        await process_document(
+            foreign_id,
+            StaticPageExtractor(
+                [ExtractedPage(1, "Tenant Beta secret code is ORANGE-77.", ExtractionMethod.native)]
+            ),
+        )
+
+        try:
+            from backend.app.main import app
+
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as client:
+                search = await client.get("/api/v1/search", params={"q": "tenant launch secret"})
+                qa = await client.post(
+                    "/api/v1/qa", json={"question": "What is the Tenant Alpha launch date?"}
+                )
+            assert search.status_code == 200
+            assert {item["document_id"] for item in search.json()["results"]} == {local_id}
+            assert qa.status_code == 200
+            assert qa.json()["status"] == "answered"
+            assert {item["document_id"] for item in qa.json()["citations"]} == {local_id}
+            assert all(
+                item["document_id"] == local_id
+                for item in qa.json()["retrieval"]["results"]
+            )
+        finally:
+            await _delete_documents([local_id, foreign_id])
+            async with get_sessionmaker()() as session:
+                await session.delete(foreign_tenant)
+                await session.commit()
+            await get_engine().dispose()
+
+    asyncio.run(scenario())
+
+
 def test_postgres_qa_evaluation_dataset_execution(tmp_path, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", _postgres_url())
 
@@ -249,6 +320,7 @@ def test_postgres_qa_evaluation_dataset_execution(tmp_path, monkeypatch):
                     return await answer_question(
                         session,
                         question,
+                        LEGACY_TENANT_ID,
                         document_ids=document_ids,
                         retrieval_limit=retrieval_limit,
                     )

@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Text,
+    text,
 )
 from sqlmodel import Field, SQLModel
 
@@ -23,6 +24,13 @@ class ProcessingStatus(str, Enum):
     uploaded = "uploaded"
     processing = "processing"
     processed = "processed"
+    failed = "failed"
+
+
+class ProcessingJobStatus(str, Enum):
+    queued = "queued"
+    running = "running"
+    succeeded = "succeeded"
     failed = "failed"
 
 
@@ -61,6 +69,43 @@ class QaAnswerStatus(str, Enum):
     insufficient_evidence = "insufficient_evidence"
 
 
+LEGACY_TENANT_ID = "00000000-0000-0000-0000-000000000001"
+
+
+class UserRole(str, Enum):
+    admin = "admin"
+    reviewer = "reviewer"
+    viewer = "viewer"
+
+
+class Tenant(SQLModel, table=True):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    name: str
+    slug: str = Field(unique=True, index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class User(SQLModel, table=True):
+    __tablename__ = "app_user"
+    __table_args__ = (
+        Index("uq_app_user_tenant_email", "tenant_id", "email", unique=True),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenant.id", index=True)
+    email: str = Field(index=True)
+    password_hash: str
+    role: UserRole = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(UserRole, native_enum=False, create_constraint=False),
+            nullable=False,
+        )
+    )
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class Document(SQLModel, table=True):
     id: Optional[str] = Field(
         default_factory=lambda: str(uuid.uuid4()), primary_key=True
@@ -69,6 +114,9 @@ class Document(SQLModel, table=True):
     content_type: str
     size: int
     storage_path: str
+    tenant_id: str = Field(
+        default=LEGACY_TENANT_ID, foreign_key="tenant.id", index=True
+    )
     status: ProcessingStatus = Field(
         default=ProcessingStatus.uploaded,
         sa_column=Column(
@@ -80,6 +128,56 @@ class Document(SQLModel, table=True):
     )
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class DocumentProcessingJob(SQLModel, table=True):
+    """Durable lifecycle record for one document processing request."""
+
+    __tablename__ = "document_processing_job"
+    __table_args__ = (
+        CheckConstraint("attempt_count >= 0", name="ck_processing_job_attempt_count"),
+        CheckConstraint("max_attempts > 0", name="ck_processing_job_max_attempts"),
+        Index(
+            "uq_processing_job_active_document",
+            "document_id",
+            unique=True,
+            postgresql_where=text("status IN ('queued', 'running')"),
+            sqlite_where=text("status IN ('queued', 'running')"),
+        ),
+    )
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    document_id: str = Field(
+        foreign_key="document.id", ondelete="CASCADE", index=True
+    )
+    status: ProcessingJobStatus = Field(
+        default=ProcessingJobStatus.queued,
+        sa_column=Column(
+            SQLAlchemyEnum(
+                ProcessingJobStatus, native_enum=False, create_constraint=False
+            ),
+            nullable=False,
+        ),
+    )
+    attempt_count: int = 0
+    max_attempts: int = 2
+    last_error_code: Optional[str] = None
+    queued_at: datetime = Field(default_factory=utc_now)
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class ProcessingJobResponse(SQLModel):
+    id: str
+    document_id: str
+    status: ProcessingJobStatus
+    attempt_count: int
+    max_attempts: int
+    last_error_code: Optional[str]
+    queued_at: datetime
+    started_at: Optional[datetime]
+    finished_at: Optional[datetime]
+    updated_at: datetime
 
 
 class DocumentPage(SQLModel, table=True):
@@ -270,7 +368,6 @@ class DocumentChunk(SQLModel, table=True):
 
 class StructuredFieldCorrectionRequest(SQLModel):
     value: str = Field(min_length=1, max_length=2000)
-    reviewer_id: str = Field(min_length=1, max_length=100)
 
 
 class StructuredFieldResponse(SQLModel):

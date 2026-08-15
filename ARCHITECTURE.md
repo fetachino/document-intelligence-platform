@@ -7,12 +7,16 @@ Goals
 - Allow later replacement of local worker with distributed workers
 
 High level components
-- Frontend (React + TypeScript): upload UI and document library; review, search, and
-  citation-grounded Q&A interfaces are planned
+- Frontend (React + TypeScript): typed API client, upload and document workspace, processing
+  lifecycle polling, classification review, structured-field review, semantic search, and
+  citation-grounded Q&A
 - Backend (FastAPI): API, DB models, document ingestion, processing orchestration, secure storage
-- Storage: local file storage adapter for dev; S3-compatible adapter planned for production
+- Identity: local Argon2 password verification and bounded signed access tokens behind
+  replaceable adapters; centralized admin, reviewer, and viewer route policies
+- Storage: replaceable local-default or S3-compatible private object storage provider
 - Database: PostgreSQL with pgvector for stored embeddings and cosine retrieval
-- Worker: local FastAPI background tasks; distributed workers are planned
+- Worker: durable processing jobs executed through the local FastAPI background-task transport
+  by default or delivered through Redis/RQ to a standalone process
 - Providers: replaceable local OCR, classification, extraction, embedding, and answer
   implementations; external providers are planned
 
@@ -34,9 +38,27 @@ Database strategy
 - Development and unit tests use SQLite + aiosqlite for fast, isolated runs.
 - PostgreSQL integration and the containerized runtime use pgvector with asyncpg.
 - Schema changes are managed with Alembic migrations located in alembic/; do not rely on SQLModel.metadata.create_all() in production.
+- Documents carry explicit tenant ownership. Derived rows inherit isolation through document
+  foreign keys, and retrieval joins tenant-owned documents before applying result limits.
+
+Current authentication and tenant slice
+- Users belong to one tenant and authenticate with workspace slug, email, and password.
+- Passwords are stored as Argon2 hashes. Short-lived HS256 tokens carry only user identity;
+  active status, tenant, and current role are reloaded from the database for each request.
+- Viewer access is read-only, reviewers may correct classifications and structured fields,
+  and admins may also upload and reprocess documents.
+- API document lookups, search scopes, and Q&A scopes enforce tenant ownership and use 404
+  responses for foreign identifiers. Workers remain trusted internal consumers of durable IDs.
 
 Storage
-- Local file storage adapter is used for Milestone 1. Files are written off the event loop and filenames are sanitized. S3-compatible adapters will be added in a later milestone.
+- `StorageProvider` owns save, read, and delete operations using application-generated object
+  keys. Local filesystem storage remains the default development implementation.
+- The S3-compatible provider supports configurable bucket, region, endpoint, credentials, and
+  path-style addressing. SDK operations run off the event loop with bounded timeouts and retries.
+- New database references are relative object keys, not machine-specific paths. The local
+  provider can still read legacy absolute references created by earlier milestones.
+- Workers retrieve bytes through the same provider and materialize only a short-lived local file
+  for OCR libraries that require a path. Signed URLs and public object access are not implemented.
 
 Current OCR slice
 - Successful uploads enqueue document processing through a replaceable dispatcher.
@@ -65,7 +87,7 @@ Current structured extraction slice
 Current structured field review slice
 - Corrections are append-only records keyed to a document, field name, and value index.
 - Each review records the automatic value seen, previous effective value, corrected
-  value, local reviewer identifier, and timestamp without changing extraction provenance.
+  value, authenticated reviewer identifier, and timestamp without changing extraction provenance.
 - Extraction responses expose automatic and effective values separately.
 - Reprocessing preserves corrections for fields that still exist. Review history marks
   older corrections as superseded and missing current fields as orphaned.
@@ -91,3 +113,45 @@ Current grounded Q&A and evaluation slice
 - Responses include citations and the ranked retrieval set with pgvector distances.
 - The checked-in synthetic evaluation dataset measures answer status, expected content,
   citations, provenance grounding, and retrieval relevance for local development only.
+
+Current background worker slice
+- `DocumentJobDispatcher` persists an explicit job before handing its ID to a transport.
+- `DocumentJobWorker` claims queued work atomically, runs the existing idempotent document
+  processor, and records terminal state without exposing document text in errors.
+- Jobs expose queued, running, succeeded, and failed states, timestamps, bounded attempt
+  counts, and stable error codes. Re-enqueueing active work returns the existing job;
+  reprocessing after a terminal job creates a new history record.
+- FastAPI `BackgroundTasks` remains the default local transport. `JOB_TRANSPORT=rq` selects a
+  thin Redis/RQ adapter that sends only persisted job IDs to `backend.app.worker`.
+- The standalone worker invokes the same atomic claim and bounded-attempt loop. RQ retries are
+  disabled so transport delivery cannot compete with database-owned retry state; duplicate
+  deliveries become no-ops after a job leaves queued state.
+
+Kubernetes deployment scaffolding
+- Plain manifests under `deploy/kubernetes` describe stateless API, frontend, and RQ worker
+  workloads plus a one-shot Alembic migration Job. No Helm chart or cloud resources are included.
+- API and worker pods use the S3-compatible provider and external PostgreSQL/Redis endpoints;
+  no uploaded documents or durable job state are stored in pod filesystems.
+- Non-secret settings come from ConfigMaps. Connection URLs, signing material, bootstrap values,
+  and optional S3 credentials are referenced from an operator-managed Secret.
+- ClusterIP Services expose the API and frontend inside the cluster. Ingress, TLS, domains,
+  external service provisioning, image publication, and production-cluster validation remain
+  deployment-operator responsibilities.
+
+Current frontend workspace slice
+- A centralized typed client owns document, job-history, upload, and reprocessing requests.
+- The document workspace polls only while the selected document has queued or running work,
+  prevents overlapping polls, and cleans up timers when work completes or selection changes.
+- The Vite development server proxies same-origin `/api` requests to FastAPI; Docker Compose
+  supplies the backend service target without exposing backend addresses to UI components.
+- Classification state is loaded per selected document. Human corrections use the existing
+  review API, preserve the automatic prediction, and refresh the persisted effective type.
+- Structured extraction and correction history are loaded together per selected document.
+  Field corrections preserve automatic values and provenance while displaying the backend's
+  active, superseded, and orphaned audit statuses without client-side reinterpretation.
+- Semantic search is retrieval-only and supports global or selected-document scope. The UI
+  preserves ranked chunk provenance, embedding version, and pgvector cosine distance while
+  request versioning prevents older responses from replacing newer search state.
+- Grounded Q&A supports global or selected-document scope and renders backend answers,
+  insufficient-evidence status, citations, provider identifiers, and ranked retrieval context
+  without deriving confidence or provenance in the client.

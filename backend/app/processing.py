@@ -1,4 +1,7 @@
+import asyncio
 import logging
+import tempfile
+from enum import Enum
 from pathlib import Path
 
 from sqlalchemy import delete
@@ -35,8 +38,15 @@ from .structured_extraction import (
     StructuredExtractor,
     StructuredTextPage,
 )
+from .storage import StorageProvider, get_storage_provider
 
 logger = logging.getLogger(__name__)
+
+
+class ProcessingOutcome(str, Enum):
+    succeeded = "succeeded"
+    failed = "failed"
+    document_not_found = "document_not_found"
 
 
 async def process_document(
@@ -46,15 +56,19 @@ async def process_document(
     structured_extractor: StructuredExtractor | None = None,
     embedding_provider: EmbeddingProvider | None = None,
     chunker: TextChunker | None = None,
-) -> None:
+    storage_provider: StorageProvider | None = None,
+) -> ProcessingOutcome:
     """Extract page text, classify, extract fields, and index chunks."""
-    storage_path = await _mark_processing(document_id)
-    if storage_path is None:
-        return
+    document_source = await _mark_processing(document_id)
+    if document_source is None:
+        return ProcessingOutcome.document_not_found
 
     active_extractor = extractor or LocalPageTextExtractor()
     try:
-        pages = await active_extractor.extract(Path(storage_path))
+        active_storage = storage_provider or get_storage_provider()
+        filename, storage_reference = document_source
+        content = await active_storage.read(storage_reference)
+        pages = await _extract_pages(active_extractor, filename, content)
         if not pages:
             raise ValueError("document_has_no_pages")
         await _store_pages(document_id, pages)
@@ -76,12 +90,14 @@ async def process_document(
             embedding_provider,
             chunker,
         )
+        return ProcessingOutcome.succeeded
     except Exception:
         logger.exception("Document processing failed for id=%s", document_id)
         await _mark_failed(document_id)
+        return ProcessingOutcome.failed
 
 
-async def _mark_processing(document_id: str) -> str | None:
+async def _mark_processing(document_id: str) -> tuple[str, str] | None:
     async for session in get_session():
         result = await session.execute(select(Document).where(Document.id == document_id))
         document = result.scalar_one_or_none()
@@ -90,8 +106,27 @@ async def _mark_processing(document_id: str) -> str | None:
         document.status = ProcessingStatus.processing
         document.updated_at = utc_now()
         await session.commit()
-        return document.storage_path
+        return document.filename, document.storage_path
     return None
+
+
+async def _extract_pages(
+    extractor: PageTextExtractor, filename: str, content: bytes
+) -> list[ExtractedPage]:
+    """Materialize provider bytes only for path-based local OCR libraries."""
+
+    suffix = Path(filename).suffix.lower()
+
+    def create_temporary_file() -> Path:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temporary:
+            temporary.write(content)
+            return Path(temporary.name)
+
+    temporary_path = await asyncio.to_thread(create_temporary_file)
+    try:
+        return await extractor.extract(temporary_path)
+    finally:
+        await asyncio.to_thread(temporary_path.unlink, missing_ok=True)
 
 
 async def _store_pages(document_id: str, pages: list[ExtractedPage]) -> None:

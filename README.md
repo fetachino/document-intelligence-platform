@@ -1,44 +1,248 @@
-Document Intelligence Platform (Milestone 2)
+# Document Intelligence Platform
 
-This repository implements Milestone 1 plus local OCR/per-page text storage and a
-versioned local document classifier with API-based correction history. Deterministic
-structured extraction is available for invoice, resume, and contract documents with
-page provenance. An API-based field review workflow preserves automatic values and
-append-only correction history. Page-bounded chunks, deterministic local development
-embeddings, and pgvector cosine search are available through the retrieval API. Answer
-generation uses a deterministic local extractive provider that either returns cited
-source sentences or an insufficient-evidence response. A checked-in synthetic evaluation
-dataset exercises grounding and retrieval behavior without claiming production quality.
+A full-stack document processing workspace that turns uploaded PDFs, images, and DOCX files into searchable, reviewable data. The platform runs OCR, classification, structured extraction, vector indexing, and citation-grounded Q&A through durable background jobs, with tenant isolation and role-based access enforced by the backend.
 
-Grounded Q&A API
-- `POST /api/v1/qa` accepts a question, optional document IDs, and a retrieval limit.
-- Answers include stored chunk citations and ranked retrieval metadata.
-- The answering provider receives retrieved text only and has no database or tool access.
+This repository is a portfolio project focused on understandable service boundaries, deterministic local providers, auditability, and end-to-end verification. Production deployment configuration is not included yet.
 
-Local deterministic evaluation
-- The included synthetic dataset contains five development cases for answerability,
-  refusal, multiple citations, document scoping, and retrieval relevance.
-- Latest verified results on this included dataset are 5/5 for answer status, expected
-  answer content, citation accuracy, citation grounding, and retrieval relevance.
-- These are deterministic fixture results only, not production benchmarks or claims about
-  performance on real-world documents.
+## Core Capabilities
 
-OCR runtime
-- PDFs use native text when available and local Tesseract OCR for image-only pages.
-- PNG and JPEG uploads use local Tesseract OCR.
-- DOCX uploads are stored as one native-text page because DOCX has no stable page model.
-- The backend Docker image includes Tesseract. Direct host execution requires the
-  `tesseract` executable to be installed and available on `PATH`.
+| Area | Implemented behavior |
+| --- | --- |
+| Ingestion and storage | Validated document upload with local filesystem or private S3-compatible object storage |
+| OCR and text | Native PDF/DOCX extraction, Tesseract OCR fallback, and per-page text persistence |
+| Classification | Replaceable classifier with `invoice`, `resume`, `contract`, `other`, and `unknown` types |
+| Structured extraction | Deterministic invoice, resume, and contract field extraction with page provenance |
+| Human review | Classification correction plus structured-field corrections with append-only audit history |
+| Retrieval | Page-bounded chunking, deterministic local embeddings, pgvector storage, and cosine search |
+| Grounded Q&A | Retrieval-separated answer generation, stored-provenance citations, and explicit insufficient-evidence responses |
+| Background processing | Durable queued/running/succeeded/failed jobs, atomic claiming, bounded retries, and reprocessing history |
+| Worker transport | Local FastAPI background tasks by default or Redis/RQ delivery to a standalone worker |
+| Frontend | React document library and workspace with job polling, review interfaces, semantic search, and grounded Q&A |
+| Access control | Local authentication, tenant-scoped data access, and centralized viewer/reviewer/admin RBAC |
 
-Poetry dependency management
-- pyproject.toml is the single source of truth.
-- To generate a lock file locally and pin dependencies, run:
-  poetry lock
-  git add poetry.lock
-  git commit -m "chore: lock dependencies"
+## Technology Stack
 
-Running verification
-- Use the provided verification script to run the same checks as CI:
-  .\scripts\verify.ps1
+| Layer | Technologies |
+| --- | --- |
+| Backend | Python 3.12, FastAPI, SQLModel, SQLAlchemy async, Uvicorn, Pydantic |
+| Frontend | React 18, TypeScript, Vite |
+| Database and vector search | PostgreSQL, pgvector, asyncpg, Alembic |
+| Background processing | Durable PostgreSQL job records, FastAPI `BackgroundTasks`, Redis, RQ |
+| Document processing | pypdf, pypdfium2, Tesseract/pytesseract, Pillow, python-docx |
+| Storage | Local filesystem provider, boto3-based S3-compatible provider |
+| Authentication | Argon2 password hashing with pwdlib, signed access tokens with PyJWT |
+| Testing and quality | pytest, Vitest, Testing Library, Ruff, mypy, ESLint, TypeScript checks, Alembic migration checks, coverage |
+| Containers and CI | Docker, Docker Compose, GitHub Actions |
 
-If you prefer to run steps manually, follow the commands in scripts/verify.ps1.
+## Architecture
+
+```mermaid
+flowchart LR
+    B[Browser] --> F[React frontend]
+    F --> A[FastAPI API]
+    A --> I[Authentication and tenant RBAC]
+    A --> D[(PostgreSQL and pgvector)]
+    A --> S[Local or S3-compatible storage]
+    A --> J[Durable processing job]
+    J --> T{Job transport}
+    T -->|Local| L[FastAPI background task]
+    T -->|Distributed| R[Redis and RQ]
+    R --> W[Standalone worker]
+    L --> P[Document processing pipeline]
+    W --> P
+    P --> S
+    P --> O[OCR and native text extraction]
+    O --> C[Classification and structured extraction]
+    C --> E[Chunking and embeddings]
+    E --> D
+    D --> Q[Semantic search and grounded Q&A]
+    Q --> A
+```
+
+PostgreSQL is authoritative for processing lifecycle and retry state. Queue transports carry durable job IDs only. Workers load the document and storage reference from the database, claim work atomically, and run the same processing pipeline whether delivery is local or through RQ.
+
+## Document Processing Flow
+
+1. An authenticated admin uploads a validated document.
+2. The API stores the object and creates a durable queued job.
+3. A local or standalone worker atomically claims the job.
+4. Native text extraction runs first; image-only content falls back to Tesseract OCR.
+5. Per-page text is classified and passed to the matching structured extraction schema.
+6. Page text is chunked, embedded, and indexed in pgvector.
+7. Semantic search retrieves tenant-scoped chunks; grounded Q&A answers only from that context.
+8. Reviewers can correct classifications and extracted fields without replacing automatic provenance or prior audit entries.
+
+Reprocessing is idempotent: automatic outputs and stale chunks are replaced transactionally, while applicable human corrections and historical job records remain auditable.
+
+## Repository Structure
+
+```text
+backend/             FastAPI application, processing providers, worker entrypoint, tests, and evaluation data
+frontend/            React/TypeScript workspace, centralized API client, and Vitest suites
+alembic/             Versioned PostgreSQL schema migrations
+scripts/             Repository verification and local diagnostic scripts
+.github/workflows/   GitHub Actions CI workflow
+docker-compose.yml   PostgreSQL/pgvector, Redis, API, worker, and frontend services
+```
+
+Project configuration and lock files remain at the repository root so Poetry and Docker can use the monorepo build context without packaging the root as a Python library.
+
+## Running Locally
+
+### Prerequisites
+
+- Python 3.12
+- Poetry
+- Node.js and npm
+- Docker Desktop with the Linux container engine running
+- PowerShell for the repository verification script
+
+The Compose workflow is the simplest way to run the complete stack because the backend image already includes Tesseract.
+
+### 1. Configure the environment
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Edit `.env` and set at minimum:
+
+```dotenv
+AUTH_TOKEN_SECRET=replace-with-a-random-value-of-at-least-32-characters
+BOOTSTRAP_TENANT_NAME=Local workspace
+BOOTSTRAP_TENANT_SLUG=local
+BOOTSTRAP_ADMIN_EMAIL=admin@example.test
+BOOTSTRAP_ADMIN_PASSWORD=replace-with-at-least-12-characters
+```
+
+Bootstrap creation is opt-in and idempotent. Credentials are read from the environment, and only the Argon2 password hash is stored.
+
+Optional provider settings:
+
+- Set `JOB_TRANSPORT=rq` to dispatch API-created jobs through Redis to the standalone worker. The default is `local`.
+- Set `STORAGE_BACKEND=s3` and the documented `S3_*` variables to use a generic S3-compatible private bucket. The default is `local`.
+
+### 2. Start the stack
+
+```powershell
+docker compose up --build
+```
+
+Open:
+
+- Frontend workspace: `http://localhost:3000`
+- FastAPI documentation: `http://localhost:8000/docs`
+- Health endpoint: `http://localhost:8000/api/v1/health`
+
+Sign in with the workspace slug, email, and password configured above.
+
+### 3. Stop services
+
+```powershell
+docker compose stop
+```
+
+This stops the services without deleting the PostgreSQL or upload volumes.
+
+## Kubernetes Scaffolding
+
+Plain Kubernetes manifests are available in `deploy/kubernetes` for the frontend, API,
+standalone RQ worker, and one-shot Alembic migration Job. They use ConfigMaps for non-secret
+settings and reference an operator-created Secret for database, broker, token-signing, bootstrap,
+and optional S3 credentials.
+
+The manifests intentionally omit ingress, domains, certificates, and managed infrastructure.
+PostgreSQL, Redis, and S3-compatible storage remain external dependencies, and image names must
+be replaced or loaded for the target cluster. See
+[`deploy/kubernetes/README.md`](deploy/kubernetes/README.md) for local validation and apply steps.
+Docker Compose remains the supported local development workflow.
+
+## Important API Endpoints
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/v1/auth/login` | Local workspace login |
+| `GET` | `/api/v1/auth/me` | Current authenticated identity and role |
+| `POST` | `/api/v1/documents/upload` | Upload and queue a document; admin only |
+| `GET` | `/api/v1/documents/` | List documents in the current tenant |
+| `GET` | `/api/v1/documents/{document_id}/pages` | Retrieve per-page extracted text |
+| `GET/PATCH` | `/api/v1/documents/{document_id}/classification` | Read or correct document classification |
+| `GET` | `/api/v1/documents/{document_id}/extraction` | Retrieve automatic and effective structured fields |
+| `PATCH` | `/api/v1/documents/{document_id}/extraction/fields/{field_name}/{value_index}` | Correct a supported field |
+| `GET` | `/api/v1/documents/{document_id}/extraction/reviews` | Retrieve append-only correction history |
+| `GET` | `/api/v1/search` | Tenant-scoped semantic chunk retrieval |
+| `POST` | `/api/v1/qa` | Tenant-scoped grounded Q&A with citations |
+| `GET` | `/api/v1/documents/{document_id}/jobs` | Processing job history and stable errors |
+| `POST` | `/api/v1/documents/{document_id}/process` | Queue idempotent reprocessing; admin only |
+
+All document-derived endpoints enforce tenant ownership on the backend. Review actions require reviewer or admin access; upload and reprocessing require admin access.
+
+## Security and Design Decisions
+
+- Passwords are hashed with Argon2; plaintext passwords are never persisted.
+- Access tokens are signed, bounded in lifetime, and configured with an environment-only secret.
+- Each authenticated request reloads the active user, tenant, and role from PostgreSQL.
+- RBAC is centralized in FastAPI dependencies. Frontend role checks improve usability but are not a security boundary.
+- Document lookups, review operations, semantic search, and Q&A enforce tenant ownership server-side.
+- Search filters by tenant before result limiting, and Q&A citations are assembled only from stored tenant-scoped chunk provenance.
+- The answering provider receives retrieved text, not database, SQL, shell, filesystem, or arbitrary tool access.
+- Storage credentials remain environment-only. Object keys are generated internally and work with local or private S3-compatible providers.
+- Workers are trusted internal processes. Queue payloads contain job IDs, not document bytes, credentials, or user-selected functions.
+
+See [SECURITY.md](SECURITY.md) for trust boundaries and [ARCHITECTURE.md](ARCHITECTURE.md) for implementation details.
+
+## Verification and Testing
+
+Run the repository-level verification from the project root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -NoProfile -File .\scripts\verify.ps1
+```
+
+The script installs locked backend and frontend dependencies, runs Ruff, mypy, PostgreSQL/Alembic migrations, pytest, ESLint, TypeScript checks, Vitest with coverage, the frontend production build, and both repository-root Docker image builds. GitHub Actions runs the corresponding checks for pushes and pull requests targeting `main`.
+
+Focused tools can also be run independently:
+
+```powershell
+poetry run pytest backend/tests -q --maxfail=1
+poetry run ruff check .
+poetry run mypy backend
+$env:DATABASE_URL='postgresql+asyncpg://docuser:docpass@localhost:5432/docdb'
+poetry run alembic check
+npm.cmd --prefix frontend run test -- --run
+```
+
+## Local Q&A Evaluation
+
+`backend/evaluation/qa_dataset.json` contains a five-case deterministic synthetic dataset covering answerable and unanswerable questions, citation provenance, document scoping, and retrieval relevance. Its tests validate the local pipeline only; the dataset is not a production benchmark and does not measure performance on representative real-world document collections.
+
+## Project Status
+
+| Milestone | Status | Scope |
+| --- | --- | --- |
+| Milestone 1 | Complete | Repository foundation, ingestion, database, frontend baseline, tests, containers, and CI |
+| Milestone 2 | Complete | OCR, classification, extraction, review, embeddings, semantic search, grounded Q&A, and local evaluation |
+| Milestone 3 | Complete | Durable/distributed workers, S3-compatible storage, document workspace, authentication/RBAC, Kubernetes scaffolding, and local release hardening |
+
+## Current Limitations
+
+- Embeddings use a deterministic local token-hash provider rather than a learned production embedding model.
+- Answer generation uses a deterministic local extractive provider; no external production LLM is integrated.
+- OCR, extraction, and evaluation are intentionally conservative and do not include production accuracy claims.
+- Kubernetes manifests are static scaffolding only and have not been exercised against a production cluster.
+- Dependency audits report no known Python or npm vulnerabilities. npm still reports deprecated
+  development-only transitive packages from the ESLint 8 and Vitest coverage toolchains.
+- Starlette's legacy TestClient compatibility layer emits an upstream `httpx2` migration warning;
+  application HTTPX integrations use the supported ASGI transport API.
+- Local browser authentication stores the short-lived access token in browser storage; the security documentation describes this trust boundary and future hardening options.
+
+## Screenshots and Demo
+
+Screenshots and a demo walkthrough will be added after final UI and deployment polish.
+
+## Additional Documentation
+
+- [ARCHITECTURE.md](ARCHITECTURE.md): component boundaries and implemented processing slices
+- [ROADMAP.md](ROADMAP.md): milestone status and remaining work
+- [SECURITY.md](SECURITY.md): security controls and trust boundaries
+- [AGENTS.md](AGENTS.md): worker responsibilities and processing invariants

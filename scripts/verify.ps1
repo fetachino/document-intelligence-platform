@@ -1,6 +1,6 @@
 ﻿$ErrorActionPreference = 'Stop'
 
-Write-Host 'Starting verification script for Milestone 1...'
+Write-Host 'Starting repository verification...'
 $root = Get-Location
 
 # 1) Ensure Poetry is installed (do not auto-install)
