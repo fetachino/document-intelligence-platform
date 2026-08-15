@@ -18,7 +18,6 @@ frontend/coverage/
 
 # Runtime/generated files
 uploads/
-docs/demo/
 coverage/
 htmlcov/
 pytest_tmp/

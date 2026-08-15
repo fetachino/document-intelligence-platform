@@ -28,7 +28,9 @@ Shows a grounded answer retrieved across the document collection with citation p
 
 ### Demo Video
 
-Demo video link will be added here after hosting.
+A short walkthrough demonstrating document upload and processing, document classification/review, semantic search, and grounded Q&A with source citations.
+
+[▶ Watch the full demo](docs/demo/document-intelligence-platform-demo.mp4)
 
 ## Core Capabilities
 
