@@ -127,6 +127,17 @@ Current background worker slice
   disabled so transport delivery cannot compete with database-owned retry state; duplicate
   deliveries become no-ops after a job leaves queued state.
 
+Kubernetes deployment scaffolding
+- Plain manifests under `deploy/kubernetes` describe stateless API, frontend, and RQ worker
+  workloads plus a one-shot Alembic migration Job. No Helm chart or cloud resources are included.
+- API and worker pods use the S3-compatible provider and external PostgreSQL/Redis endpoints;
+  no uploaded documents or durable job state are stored in pod filesystems.
+- Non-secret settings come from ConfigMaps. Connection URLs, signing material, bootstrap values,
+  and optional S3 credentials are referenced from an operator-managed Secret.
+- ClusterIP Services expose the API and frontend inside the cluster. Ingress, TLS, domains,
+  external service provisioning, image publication, and production-cluster validation remain
+  deployment-operator responsibilities.
+
 Current frontend workspace slice
 - A centralized typed client owns document, job-history, upload, and reprocessing requests.
 - The document workspace polls only while the selected document has queued or running work,

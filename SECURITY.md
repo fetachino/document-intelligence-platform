@@ -58,6 +58,15 @@ Access Control
 - Background workers are trusted internal processes. They receive durable job IDs without user
   tokens and preserve tenant ownership by processing the referenced document in place.
 
+Kubernetes scaffolding
+- Checked-in manifests reference Kubernetes Secrets and do not contain deployable credentials.
+  `secret.example.yaml` is a template; the populated `secret.yaml` path is ignored by Git.
+- Workloads disable privilege escalation, drop Linux capabilities, use non-root identities, and
+  define bounded resource requests and limits. API and worker temporary files use ephemeral
+  volumes and durable document storage remains external.
+- Only ClusterIP Services are defined. Network policy, ingress, TLS, image registry controls,
+  external secret management, and cluster-level policy remain deployment-operator boundaries.
+
 Testing
 - Mock external providers in tests.
 - Include failure-case tests to ensure safe behavior on provider errors.

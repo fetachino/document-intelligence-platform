@@ -32,8 +32,9 @@ Milestone 3 (in progress)
 - Grounded Q&A frontend workflow (implemented)
 - Observable worker/job architecture with replaceable dispatcher (local slice implemented)
 - Redis/RQ transport and standalone worker process (implemented); scaling validation remains planned
-- Kubernetes deployment architecture (planned)
+- Kubernetes deployment scaffolding for API, frontend, worker, and migrations (implemented;
+  production-cluster validation remains planned)
 - S3-compatible private storage adapter (implemented); signed URL support remains planned if needed
 - Local authentication, tenant isolation, and admin/reviewer/viewer RBAC (implemented)
-- Deployment manifests for Kubernetes and cloud providers
+- Cloud-provider integration and deployment validation
 - End-to-end performance and security tests

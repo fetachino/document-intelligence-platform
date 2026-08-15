@@ -48,3 +48,5 @@ Current Milestone 3 worker slice
   claiming and bounded attempts remain authoritative.
 - Workers are trusted internal processes and do not accept end-user tokens. Tenant ownership
   remains attached to the document loaded from each durable job ID.
+- Kubernetes worker pods use the RQ transport and external PostgreSQL, Redis, and S3-compatible
+  services. Pod-local storage is temporary only; queue messages continue to contain job IDs.

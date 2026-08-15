@@ -144,6 +144,19 @@ docker compose stop
 
 This stops the services without deleting the PostgreSQL or upload volumes.
 
+## Kubernetes Scaffolding
+
+Plain Kubernetes manifests are available in `deploy/kubernetes` for the frontend, API,
+standalone RQ worker, and one-shot Alembic migration Job. They use ConfigMaps for non-secret
+settings and reference an operator-created Secret for database, broker, token-signing, bootstrap,
+and optional S3 credentials.
+
+The manifests intentionally omit ingress, domains, certificates, and managed infrastructure.
+PostgreSQL, Redis, and S3-compatible storage remain external dependencies, and image names must
+be replaced or loaded for the target cluster. See
+[`deploy/kubernetes/README.md`](deploy/kubernetes/README.md) for local validation and apply steps.
+Docker Compose remains the supported local development workflow.
+
 ## Important API Endpoints
 
 | Method | Endpoint | Purpose |
@@ -209,16 +222,16 @@ npm.cmd --prefix frontend run test -- --run
 | --- | --- | --- |
 | Milestone 1 | Complete | Repository foundation, ingestion, database, frontend baseline, tests, containers, and CI |
 | Milestone 2 | Complete | OCR, classification, extraction, review, embeddings, semantic search, grounded Q&A, and local evaluation |
-| Milestone 3 | In progress | Durable/distributed workers, S3-compatible storage, complete document workspace, authentication, tenant isolation, and RBAC are implemented |
+| Milestone 3 | In progress | Durable/distributed workers, S3-compatible storage, document workspace, authentication/RBAC, and Kubernetes scaffolding are implemented |
 
-Remaining Milestone 3 work includes deployment/Kubernetes scaffolding and final security, dependency, and end-to-end hardening.
+Remaining Milestone 3 work is final security, dependency, deployment validation, and end-to-end hardening.
 
 ## Current Limitations
 
 - Embeddings use a deterministic local token-hash provider rather than a learned production embedding model.
 - Answer generation uses a deterministic local extractive provider; no external production LLM is integrated.
 - OCR, extraction, and evaluation are intentionally conservative and do not include production accuracy claims.
-- Cloud deployment configuration and Kubernetes manifests have not been implemented.
+- Kubernetes manifests are static scaffolding only and have not been exercised against a production cluster.
 - Dependency updates and warning remediation remain part of final hardening.
 - Local browser authentication stores the short-lived access token in browser storage; the security documentation describes this trust boundary and future hardening options.
 
