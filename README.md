@@ -4,6 +4,32 @@ A full-stack document processing workspace that turns uploaded PDFs, images, and
 
 This repository is a portfolio project focused on understandable service boundaries, deterministic local providers, auditability, and end-to-end verification. Production deployment configuration is not included yet.
 
+## Application Demo
+
+The screenshots below follow the primary workflow from document processing and review through retrieval and grounded question answering.
+
+### Document Processing & Review
+
+Shows successful processing, automatic/effective contract classification, structured extraction status, and durable job history.
+
+![Document Processing & Review](docs/screenshots/document-review.png)
+
+### Semantic Search
+
+Shows selected-document semantic retrieval with ranked source chunks, page/chunk provenance, embedding model metadata, and cosine distance.
+
+![Semantic Search](docs/screenshots/semantic-search.png)
+
+### Grounded Q&A
+
+Shows a grounded answer retrieved across the document collection with citation provenance and supporting document evidence.
+
+![Grounded Q&A](docs/screenshots/grounded-qa.png)
+
+### Demo Video
+
+Demo video link will be added here after hosting.
+
 ## Core Capabilities
 
 | Area | Implemented behavior |
@@ -235,10 +261,6 @@ npm.cmd --prefix frontend run test -- --run
 - Starlette's legacy TestClient compatibility layer emits an upstream `httpx2` migration warning;
   application HTTPX integrations use the supported ASGI transport API.
 - Local browser authentication stores the short-lived access token in browser storage; the security documentation describes this trust boundary and future hardening options.
-
-## Screenshots and Demo
-
-Screenshots and a demo walkthrough will be added after final UI and deployment polish.
 
 ## Additional Documentation
 
