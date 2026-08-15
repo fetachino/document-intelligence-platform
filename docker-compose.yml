@@ -1,3 +1,4 @@
+# Local development only. Credentials and unauthenticated Redis are not deployment defaults.
 services:
   db:
     image: ankane/pgvector:latest

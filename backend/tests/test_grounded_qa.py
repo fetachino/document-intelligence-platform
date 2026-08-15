@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete
 from sqlmodel import col
 
@@ -154,7 +154,9 @@ def test_postgres_qa_api_grounding_scope_and_validation(tmp_path, monkeypatch):
         try:
             from backend.app.main import app
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as client:
                 payload = {
                     "question": "What is the Project Atlas deadline?",
                     "document_ids": [atlas_id],
@@ -268,7 +270,9 @@ def test_postgres_search_and_qa_exclude_foreign_tenant_content(tmp_path, monkeyp
         try:
             from backend.app.main import app
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as client:
                 search = await client.get("/api/v1/search", params={"q": "tenant launch secret"})
                 qa = await client.post(
                     "/api/v1/qa", json={"question": "What is the Tenant Alpha launch date?"}

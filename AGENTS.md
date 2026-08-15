@@ -37,9 +37,9 @@ Completed Milestone 2 implementation
 - Successful processing indexes non-empty page text with the replaceable local embedding
   provider and atomically replaces stale chunks.
 - Grounded Q&A uses retrieved chunks only and binds citations from stored provenance.
-- External AI providers and later deployment infrastructure remain deferred.
+- External AI providers and production cloud deployment remain deferred.
 
-Current Milestone 3 worker slice
+Completed Milestone 3 worker and deployment architecture
 - Each processing request creates a durable job with queued, running, succeeded, or failed state.
 - Only one queued or running job may exist for a document; terminal jobs remain as history.
 - The local worker atomically claims jobs and makes at most two processing attempts.

@@ -67,6 +67,16 @@ Kubernetes scaffolding
 - Only ClusterIP Services are defined. Network policy, ingress, TLS, image registry controls,
   external secret management, and cluster-level policy remain deployment-operator boundaries.
 
+Dependency review
+- The final local hardening pass reports no known vulnerabilities from `pip-audit` or `npm audit`.
+  These are point-in-time dependency checks, not a guarantee about future advisories.
+- npm still reports deprecated development-only transitive packages through ESLint 8 and the
+  Vitest coverage stack. Major toolchain migration is deferred because the audited runtime and
+  development dependency graph has no known vulnerabilities.
+- Starlette's legacy TestClient layer emits an upstream `httpx2` transition warning. Production
+  request handling does not use TestClient, and direct asynchronous integration tests use
+  HTTPX's supported `ASGITransport`.
+
 Testing
 - Mock external providers in tests.
 - Include failure-case tests to ensure safe behavior on provider errors.

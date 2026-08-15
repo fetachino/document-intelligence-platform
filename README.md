@@ -222,9 +222,7 @@ npm.cmd --prefix frontend run test -- --run
 | --- | --- | --- |
 | Milestone 1 | Complete | Repository foundation, ingestion, database, frontend baseline, tests, containers, and CI |
 | Milestone 2 | Complete | OCR, classification, extraction, review, embeddings, semantic search, grounded Q&A, and local evaluation |
-| Milestone 3 | In progress | Durable/distributed workers, S3-compatible storage, document workspace, authentication/RBAC, and Kubernetes scaffolding are implemented |
-
-Remaining Milestone 3 work is final security, dependency, deployment validation, and end-to-end hardening.
+| Milestone 3 | Complete | Durable/distributed workers, S3-compatible storage, document workspace, authentication/RBAC, Kubernetes scaffolding, and local release hardening |
 
 ## Current Limitations
 
@@ -232,7 +230,10 @@ Remaining Milestone 3 work is final security, dependency, deployment validation,
 - Answer generation uses a deterministic local extractive provider; no external production LLM is integrated.
 - OCR, extraction, and evaluation are intentionally conservative and do not include production accuracy claims.
 - Kubernetes manifests are static scaffolding only and have not been exercised against a production cluster.
-- Dependency updates and warning remediation remain part of final hardening.
+- Dependency audits report no known Python or npm vulnerabilities. npm still reports deprecated
+  development-only transitive packages from the ESLint 8 and Vitest coverage toolchains.
+- Starlette's legacy TestClient compatibility layer emits an upstream `httpx2` migration warning;
+  application HTTPX integrations use the supported ASGI transport API.
 - Local browser authentication stores the short-lived access token in browser storage; the security documentation describes this trust boundary and future hardening options.
 
 ## Screenshots and Demo

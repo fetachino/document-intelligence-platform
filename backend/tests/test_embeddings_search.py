@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from fastapi.testclient import TestClient
 from sqlalchemy import delete
 from sqlmodel import col, select
@@ -204,7 +204,9 @@ def test_postgres_search_api_relevance_and_document_isolation(tmp_path, monkeypa
 
             from backend.app.main import app
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as client:
                 response = await client.get(
                     "/api/v1/search",
                     params={"q": "quasarfruitalpha", "limit": 2},
@@ -221,7 +223,9 @@ def test_postgres_search_api_relevance_and_document_isolation(tmp_path, monkeypa
                 ocean_id,
             }
 
-            async with AsyncClient(app=app, base_url="http://test") as client:
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as client:
                 scoped_response = await client.get(
                     "/api/v1/search",
                     params={

@@ -24,17 +24,21 @@ Milestone 2 - Complete and verified
 - Grounded Q&A API with citation linking (implemented)
 - Deterministic local evaluation dataset and computed metrics (implemented)
 
-Milestone 3 (in progress)
+Milestone 3 - Complete and verified locally
 - Document library, processing lifecycle, and reprocessing frontend foundation (implemented)
 - Classification review frontend workflow (implemented)
 - Structured-field correction and review-history frontend workflow (implemented)
 - Semantic-search frontend workflow (implemented)
 - Grounded Q&A frontend workflow (implemented)
 - Observable worker/job architecture with replaceable dispatcher (local slice implemented)
-- Redis/RQ transport and standalone worker process (implemented); scaling validation remains planned
+- Redis/RQ transport and standalone worker process (implemented and exercised through local Compose)
 - Kubernetes deployment scaffolding for API, frontend, worker, and migrations (implemented;
   production-cluster validation remains planned)
-- S3-compatible private storage adapter (implemented); signed URL support remains planned if needed
+- S3-compatible private storage adapter (implemented)
 - Local authentication, tenant isolation, and admin/reviewer/viewer RBAC (implemented)
-- Cloud-provider integration and deployment validation
-- End-to-end performance and security tests
+- Dependency/security audit and end-to-end local release verification (implemented)
+
+Future work
+- Production-cluster and cloud-provider deployment validation
+- Managed-service integration, load testing, and measured performance benchmarking
+- External identity-provider integration and browser-token hardening
