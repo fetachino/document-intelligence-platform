@@ -1,5 +1,7 @@
 # Document Intelligence Platform
 
+[![CI](https://github.com/fetachino/document-intelligence-platform/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/fetachino/document-intelligence-platform/actions/workflows/ci.yml) [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/) [![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)](https://react.dev/) [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/) [![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+
 A full-stack document processing workspace that turns uploaded PDFs, images, and DOCX files into searchable, reviewable data. The platform runs OCR, classification, structured extraction, vector indexing, and citation-grounded Q&A through durable background jobs, with tenant isolation and role-based access enforced by the backend.
 
 This repository is a portfolio project focused on understandable service boundaries, deterministic local providers, auditability, and end-to-end verification. Kubernetes deployment scaffolding is included for the current API, frontend, and worker; production infrastructure, ingress, TLS, managed services, and a live deployment are intentionally not included.
