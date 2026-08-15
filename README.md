@@ -2,7 +2,13 @@
 
 A full-stack document processing workspace that turns uploaded PDFs, images, and DOCX files into searchable, reviewable data. The platform runs OCR, classification, structured extraction, vector indexing, and citation-grounded Q&A through durable background jobs, with tenant isolation and role-based access enforced by the backend.
 
-This repository is a portfolio project focused on understandable service boundaries, deterministic local providers, auditability, and end-to-end verification. Production deployment configuration is not included yet.
+This repository is a portfolio project focused on understandable service boundaries, deterministic local providers, auditability, and end-to-end verification. Kubernetes deployment scaffolding is included for the current API, frontend, and worker; production infrastructure, ingress, TLS, managed services, and a live deployment are intentionally not included.
+
+**Quick Links:** [Application Demo](#application-demo) · [Architecture](#architecture) · [Running Locally](#running-locally) · [Security](SECURITY.md)
+
+## Why I Built This
+
+This project demonstrates production-oriented full-stack engineering across document processing, OCR, vector retrieval, grounded Q&A, human review, authentication and tenant isolation, background workers, storage abstractions, CI, and containerized deployment scaffolding.
 
 ## Application Demo
 
@@ -22,7 +28,7 @@ Shows selected-document semantic retrieval with ranked source chunks, page/chunk
 
 ### Grounded Q&A
 
-Shows a grounded answer retrieved across the document collection with citation provenance and supporting document evidence.
+Shows a grounded answer retrieved from the selected document with citation provenance and supporting document evidence.
 
 ![Grounded Q&A](docs/screenshots/grounded-qa.png)
 
