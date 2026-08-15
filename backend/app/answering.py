@@ -68,11 +68,14 @@ class LocalExtractiveAnswerGenerator:
         "which",
         "who",
     }
+    _question_stopwords = {"period", "required"}
 
     async def generate(
         self, question: str, contexts: Sequence[str]
     ) -> GeneratedAnswer:
-        question_terms = self._content_terms(question)
+        # Question framing such as "required" and "period" need not occur
+        # verbatim in a grounded statement that supplies the requested value.
+        question_terms = self._content_terms(question, question=True)
         if not question_terms:
             return self._insufficient()
 
@@ -112,11 +115,12 @@ class LocalExtractiveAnswerGenerator:
             evidence_indices=tuple(evidence_indices),
         )
 
-    def _content_terms(self, text: str) -> set[str]:
+    def _content_terms(self, text: str, *, question: bool = False) -> set[str]:
         return {
             self._normalize_token(token)
             for token in self._token_pattern.findall(text.casefold())
             if token not in self._stopwords
+            and (not question or token not in self._question_stopwords)
         }
 
     @staticmethod

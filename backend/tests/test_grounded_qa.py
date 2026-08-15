@@ -85,6 +85,22 @@ def test_local_generator_refuses_incomplete_evidence():
     assert result.evidence_indices == ()
 
 
+def test_local_generator_answers_notice_period_from_direct_evidence():
+    result = asyncio.run(
+        LocalExtractiveAnswerGenerator().generate(
+            "What notice period is required for the client to terminate for convenience?",
+            [
+                "Client may terminate for convenience with 45 days written notice "
+                "and payment for work completed through the termination date."
+            ],
+        )
+    )
+
+    assert result.status == QaAnswerStatus.answered
+    assert result.answer.startswith("Client may terminate for convenience with 45 days")
+    assert result.evidence_indices == (0,)
+
+
 def _postgres_url() -> str:
     url = os.getenv("DATABASE_URL", "")
     if not url.startswith("postgresql+asyncpg://"):
