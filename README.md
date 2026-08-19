@@ -8,6 +8,19 @@ This repository is a portfolio project focused on understandable service boundar
 
 **Quick Links:** [Application Demo](#application-demo) · [Architecture](#architecture) · [Running Locally](#running-locally) · [Security](SECURITY.md)
 
+## What this proves
+
+- Full-stack delivery across React, FastAPI, PostgreSQL, workers, and Docker
+- Document-processing workflows with OCR, deterministic extraction, review,
+  and page-level provenance
+- Retrieval and grounded Q&A with explicit insufficient-evidence behavior
+- Secure multi-tenant application boundaries with authentication, RBAC, audit
+  history, and repeatable CI verification
+
+**Local demo:** follow [Running Locally](#running-locally), then open the
+document workspace at <http://localhost:5173> and API docs at
+<http://localhost:8000/docs> when the stack is running.
+
 ## Why I Built This
 
 This project demonstrates production-oriented full-stack engineering across document processing, OCR, vector retrieval, grounded Q&A, human review, authentication and tenant isolation, background workers, storage abstractions, CI, and containerized deployment scaffolding.
